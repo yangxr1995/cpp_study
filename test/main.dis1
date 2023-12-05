@@ -1,0 +1,117 @@
+
+./main.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <_Z5func2i>:
+#include <iostream>
+using namespace std;
+
+
+void func2(int a)
+{
+   0:	push	{fp}		; (str fp, [sp, #-4]!) // 保存func的fp
+							  // 因为func2 没有函数调用，所以不需要保存lr
+   4:	add	fp, sp, #0        // 设置自己的fp
+   8:	sub	sp, sp, #20       // 分配栈变量
+   c:	str	r0, [fp, #-16]
+	int c;
+
+	c = a;
+  10:	ldr	r3, [fp, #-16]
+  14:	str	r3, [fp, #-8]
+	c =sizeof(a);
+  18:	mov	r3, #4
+  1c:	str	r3, [fp, #-8]
+}
+  20:	nop			; (mov r0, r0)
+  24:	add	sp, fp, #0
+  28:	pop	{fp}		; (ldr fp, [sp], #4)
+                        // 将栈的数据弹4字节到fp，
+						// fp = *sp; sp += 4;
+						// fp指向母函数的fp
+  2c:	bx	lr          // pc = lr
+
+00000030 <_Z4funci>:
+
+void func(int a)
+{
+  30:	push	{fp, lr}    // 保存main的fp 和 lr
+  34:	add	fp, sp, #4      // 设置func的 fp , fp = sp + 4
+  38:	sub	sp, sp, #16     // 为局部变量分配空间
+                            // 为每个变量分配了8字节，
+							// 实际上每个变量只需要4字节
+
+  3c:	str	r0, [fp, #-16]  // 将形参的值传递给实参 a
+	int b;
+
+	b = a;
+  40:	ldr	r3, [fp, #-16] 
+  44:	str	r3, [fp, #-8]
+
+	func2(11);
+  48:	mov	r0, #11
+  4c:	bl	0 <_Z5func2i>
+}
+  50:	nop			; (mov r0, r0)
+  54:	sub	sp, fp, #4     // sp = fp - 4
+                           // 和 34行对应
+  58:	pop	{fp, pc}       // fp = 母函数的fp值，pc = lr , sp += 8
+
+0000005c <main>:
+
+int main()
+{
+  5c:	push	{fp, lr} // 保存main的母函数的fp，lr , sp -= 8 ,满减栈
+  60:	add	fp, sp, #4   // 设置main的 fp, fp = sp + 4， fp 指向存放lr的内存
+
+	func(11);
+  64:	mov	r0, #11      // 传递参数数量少，使用寄存器传参
+  68:	bl	30 <_Z4funci> // lr = pc + 4 ; pc = _Z4funci 
+
+	return 0;
+  6c:	mov	r3, #0
+}
+  70:	mov	r0, r3
+  74:	pop	{fp, pc}
+
+00000078 <_Z41__static_initialization_and_destruction_0ii>:
+  78:	push	{fp, lr}
+  7c:	add	fp, sp, #4
+  80:	sub	sp, sp, #8
+  84:	str	r0, [fp, #-8]
+  88:	str	r1, [fp, #-12]
+  8c:	ldr	r3, [fp, #-8]
+  90:	cmp	r3, #1
+  94:	bne	c0 <_Z41__static_initialization_and_destruction_0ii+0x48>
+  98:	ldr	r3, [fp, #-12]
+  9c:	ldr	r2, [pc, #40]	; cc <_Z41__static_initialization_and_destruction_0ii+0x54>
+  a0:	cmp	r3, r2
+  a4:	bne	c0 <_Z41__static_initialization_and_destruction_0ii+0x48>
+  extern wostream wclog;	/// Linked to standard error (buffered)
+#endif
+  ///@}
+
+  // For construction of filebuffers for cout, cin, cerr, clog et. al.
+  static ios_base::Init __ioinit;
+  a8:	ldr	r0, [pc, #32]	; d0 <_Z41__static_initialization_and_destruction_0ii+0x58>
+  ac:	bl	0 <_ZNSt8ios_base4InitC1Ev>
+  b0:	ldr	r2, [pc, #28]	; d4 <_Z41__static_initialization_and_destruction_0ii+0x5c>
+  b4:	ldr	r1, [pc, #28]	; d8 <_Z41__static_initialization_and_destruction_0ii+0x60>
+  b8:	ldr	r0, [pc, #16]	; d0 <_Z41__static_initialization_and_destruction_0ii+0x58>
+  bc:	bl	0 <__aeabi_atexit>
+  c0:	nop			; (mov r0, r0)
+  c4:	sub	sp, fp, #4
+  c8:	pop	{fp, pc}
+  cc:	.word	0x0000ffff
+	...
+
+000000dc <_GLOBAL__sub_I__Z5func2i>:
+  dc:	push	{fp, lr}
+  e0:	add	fp, sp, #4
+  e4:	ldr	r1, [pc, #8]	; f4 <_GLOBAL__sub_I__Z5func2i+0x18>
+  e8:	mov	r0, #1
+  ec:	bl	78 <_Z41__static_initialization_and_destruction_0ii>
+  f0:	pop	{fp, pc}
+  f4:	.word	0x0000ffff

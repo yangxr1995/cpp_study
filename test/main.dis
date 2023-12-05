@@ -1,0 +1,102 @@
+
+./main.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <_Z4funci>:
+#include <iostream>
+using namespace std;
+
+void func(int a)
+{
+   0:	push	{fp}		; (str fp, [sp, #-4]!)
+   4:	add	fp, sp, #0
+   8:	sub	sp, sp, #12
+   c:	str	r0, [fp, #-8]
+	a = 10;	
+  10:	mov	r3, #10
+  14:	str	r3, [fp, #-8]
+}
+  18:	nop			; (mov r0, r0)
+  1c:	add	sp, fp, #0
+  20:	pop	{fp}		; (ldr fp, [sp], #4)
+  24:	bx	lr
+
+00000028 <main>:
+
+int main()
+{
+  28:	push	{fp, lr}
+  2c:	add	fp, sp, #4
+  30:	sub	sp, sp, #16
+  34:	ldr	r3, [pc, #84]	; 90 <main+0x68>
+  38:	ldr	r3, [r3]
+  3c:	str	r3, [fp, #-8]
+  40:	mov	r3, #0
+	int &&c = 10;         // 定义一个常量引用
+  44:	mov	r3, #10
+  48:	str	r3, [fp, #-16]
+  4c:	sub	r3, fp, #16
+  50:	str	r3, [fp, #-12]  // 定义c
+
+	func(c);
+  54:	ldr	r3, [fp, #-12]  // 从c获得值做地址，解指针的值传递参数
+  58:	ldr	r3, [r3]
+  5c:	mov	r0, r3
+  60:	bl	0 <_Z4funci>
+
+	return 0;
+  64:	mov	r3, #0
+}
+  68:	ldr	r2, [pc, #32]	; 90 <main+0x68>
+  6c:	ldr	r1, [r2]
+  70:	ldr	r2, [fp, #-8]
+  74:	eors	r1, r2, r1
+  78:	mov	r2, #0
+  7c:	beq	84 <main+0x5c>
+  80:	bl	0 <__stack_chk_fail>
+  84:	mov	r0, r3
+  88:	sub	sp, fp, #4
+  8c:	pop	{fp, pc}
+  90:	.word	0x00000000
+
+00000094 <_Z41__static_initialization_and_destruction_0ii>:
+  94:	push	{fp, lr}
+  98:	add	fp, sp, #4
+  9c:	sub	sp, sp, #8
+  a0:	str	r0, [fp, #-8]
+  a4:	str	r1, [fp, #-12]
+  a8:	ldr	r3, [fp, #-8]
+  ac:	cmp	r3, #1
+  b0:	bne	dc <_Z41__static_initialization_and_destruction_0ii+0x48>
+  b4:	ldr	r3, [fp, #-12]
+  b8:	ldr	r2, [pc, #40]	; e8 <_Z41__static_initialization_and_destruction_0ii+0x54>
+  bc:	cmp	r3, r2
+  c0:	bne	dc <_Z41__static_initialization_and_destruction_0ii+0x48>
+  extern wostream wclog;	/// Linked to standard error (buffered)
+#endif
+  ///@}
+
+  // For construction of filebuffers for cout, cin, cerr, clog et. al.
+  static ios_base::Init __ioinit;
+  c4:	ldr	r0, [pc, #32]	; ec <_Z41__static_initialization_and_destruction_0ii+0x58>
+  c8:	bl	0 <_ZNSt8ios_base4InitC1Ev>
+  cc:	ldr	r2, [pc, #28]	; f0 <_Z41__static_initialization_and_destruction_0ii+0x5c>
+  d0:	ldr	r1, [pc, #28]	; f4 <_Z41__static_initialization_and_destruction_0ii+0x60>
+  d4:	ldr	r0, [pc, #16]	; ec <_Z41__static_initialization_and_destruction_0ii+0x58>
+  d8:	bl	0 <__aeabi_atexit>
+  dc:	nop			; (mov r0, r0)
+  e0:	sub	sp, fp, #4
+  e4:	pop	{fp, pc}
+  e8:	.word	0x0000ffff
+	...
+
+000000f8 <_GLOBAL__sub_I__Z4funci>:
+  f8:	push	{fp, lr}
+  fc:	add	fp, sp, #4
+ 100:	ldr	r1, [pc, #8]	; 110 <_GLOBAL__sub_I__Z4funci+0x18>
+ 104:	mov	r0, #1
+ 108:	bl	94 <_Z41__static_initialization_and_destruction_0ii>
+ 10c:	pop	{fp, pc}
+ 110:	.word	0x0000ffff

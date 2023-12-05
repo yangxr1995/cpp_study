@@ -1,0 +1,138 @@
+
+./main.o:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+00000000 <main>:
+#include <iostream>
+using namespace std;
+
+int main()
+{
+   0:	push	{fp, lr}
+   4:	add	fp, sp, #4
+   8:	sub	sp, sp, #16
+   c:	ldr	r3, [pc, #268]	; 120 <main+0x120>
+  10:	ldr	r3, [r3]
+  14:	str	r3, [fp, #-8]
+  18:	mov	r3, #0
+	const int a = 10;
+  1c:	mov	r3, #10
+  20:	str	r3, [fp, #-16]
+	int *p = (int *)&a;
+  24:	sub	r3, fp, #16
+  28:	str	r3, [fp, #-12]
+	*p = 30;
+  2c:	ldr	r3, [fp, #-12]
+  30:	mov	r2, #30
+  34:	str	r2, [r3]
+	cout << "*p : " << *p << endl;
+  38:	ldr	r1, [pc, #228]	; 124 <main+0x124>
+  3c:	ldr	r0, [pc, #228]	; 128 <main+0x128>
+  40:	bl	0 <_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc>
+  44:	mov	r2, r0
+  48:	ldr	r3, [fp, #-12]
+  4c:	ldr	r3, [r3]
+  50:	mov	r1, r3
+  54:	mov	r0, r2
+  58:	bl	0 <_ZNSolsEi>
+  5c:	mov	r3, r0
+  60:	ldr	r1, [pc, #196]	; 12c <main+0x12c>
+  64:	mov	r0, r3
+  68:	bl	0 <_ZNSolsEPFRSoS_E>
+	cout << "a : " << a << endl;
+  6c:	ldr	r1, [pc, #188]	; 130 <main+0x130>
+  70:	ldr	r0, [pc, #176]	; 128 <main+0x128>
+  74:	bl	0 <_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc>
+  78:	mov	r3, r0
+  7c:	mov	r1, #10
+  80:	mov	r0, r3
+  84:	bl	0 <_ZNSolsEi>
+  88:	mov	r3, r0
+  8c:	ldr	r1, [pc, #152]	; 12c <main+0x12c>
+  90:	mov	r0, r3
+  94:	bl	0 <_ZNSolsEPFRSoS_E>
+	cout << "&a : " << &a << endl;
+  98:	ldr	r1, [pc, #148]	; 134 <main+0x134>
+  9c:	ldr	r0, [pc, #132]	; 128 <main+0x128>
+  a0:	bl	0 <_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc>
+  a4:	mov	r2, r0
+  a8:	sub	r3, fp, #16
+  ac:	mov	r1, r3
+  b0:	mov	r0, r2
+  b4:	bl	0 <_ZNSolsEPKv>
+  b8:	mov	r3, r0
+  bc:	ldr	r1, [pc, #104]	; 12c <main+0x12c>
+  c0:	mov	r0, r3
+  c4:	bl	0 <_ZNSolsEPFRSoS_E>
+	cout << "p : " << p << endl;
+  c8:	ldr	r1, [pc, #104]	; 138 <main+0x138>
+  cc:	ldr	r0, [pc, #84]	; 128 <main+0x128>
+  d0:	bl	0 <_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc>
+  d4:	mov	r3, r0
+  d8:	ldr	r1, [fp, #-12]
+  dc:	mov	r0, r3
+  e0:	bl	0 <_ZNSolsEPKv>
+  e4:	mov	r3, r0
+  e8:	ldr	r1, [pc, #60]	; 12c <main+0x12c>
+  ec:	mov	r0, r3
+  f0:	bl	0 <_ZNSolsEPFRSoS_E>
+
+	return 0;
+  f4:	mov	r3, #0
+}
+  f8:	ldr	r2, [pc, #32]	; 120 <main+0x120>
+  fc:	ldr	r1, [r2]
+ 100:	ldr	r2, [fp, #-8]
+ 104:	eors	r1, r2, r1
+ 108:	mov	r2, #0
+ 10c:	beq	114 <main+0x114>
+ 110:	bl	0 <__stack_chk_fail>
+ 114:	mov	r0, r3
+ 118:	sub	sp, fp, #4
+ 11c:	pop	{fp, pc}
+	...
+ 130:	.word	0x00000008
+ 134:	.word	0x00000010
+ 138:	.word	0x00000018
+
+0000013c <_Z41__static_initialization_and_destruction_0ii>:
+ 13c:	push	{fp, lr}
+ 140:	add	fp, sp, #4
+ 144:	sub	sp, sp, #8
+ 148:	str	r0, [fp, #-8]
+ 14c:	str	r1, [fp, #-12]
+ 150:	ldr	r3, [fp, #-8]
+ 154:	cmp	r3, #1
+ 158:	bne	184 <_Z41__static_initialization_and_destruction_0ii+0x48>
+ 15c:	ldr	r3, [fp, #-12]
+ 160:	ldr	r2, [pc, #40]	; 190 <_Z41__static_initialization_and_destruction_0ii+0x54>
+ 164:	cmp	r3, r2
+ 168:	bne	184 <_Z41__static_initialization_and_destruction_0ii+0x48>
+  extern wostream wclog;	/// Linked to standard error (buffered)
+#endif
+  ///@}
+
+  // For construction of filebuffers for cout, cin, cerr, clog et. al.
+  static ios_base::Init __ioinit;
+ 16c:	ldr	r0, [pc, #32]	; 194 <_Z41__static_initialization_and_destruction_0ii+0x58>
+ 170:	bl	0 <_ZNSt8ios_base4InitC1Ev>
+ 174:	ldr	r2, [pc, #28]	; 198 <_Z41__static_initialization_and_destruction_0ii+0x5c>
+ 178:	ldr	r1, [pc, #28]	; 19c <_Z41__static_initialization_and_destruction_0ii+0x60>
+ 17c:	ldr	r0, [pc, #16]	; 194 <_Z41__static_initialization_and_destruction_0ii+0x58>
+ 180:	bl	0 <__aeabi_atexit>
+ 184:	nop			; (mov r0, r0)
+ 188:	sub	sp, fp, #4
+ 18c:	pop	{fp, pc}
+ 190:	.word	0x0000ffff
+	...
+
+000001a0 <_GLOBAL__sub_I_main>:
+ 1a0:	push	{fp, lr}
+ 1a4:	add	fp, sp, #4
+ 1a8:	ldr	r1, [pc, #8]	; 1b8 <_GLOBAL__sub_I_main+0x18>
+ 1ac:	mov	r0, #1
+ 1b0:	bl	13c <_Z41__static_initialization_and_destruction_0ii>
+ 1b4:	pop	{fp, pc}
+ 1b8:	.word	0x0000ffff
