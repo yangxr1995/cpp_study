@@ -38,7 +38,7 @@ void func(int a)
                             // 为每个变量分配了8字节，
 							// 实际上每个变量只需要4字节
 
-  3c:	str	r0, [fp, #-16]  // 将形参的值传递给实参 a
+  3c:	str	r0, [fp, #-16]  // 将实参的值传递给形参 a
 	int b;
 
 	b = a;
@@ -90,6 +90,64 @@ int main()
 
 
 # const
+## 速记
+### 引用0x00000000
+```
+	// 定义引用p，引用目标是 int * const, 引用目标本身是右值，
+	// 用于做指针
+	// 1. 首先给右值目标创建匿名栈变量, 赋值0x00000000
+	// 2. 将匿名变量的地址赋值给 p, 右值本没有地址，
+	//    但创建匿名变量后就有地址
+	int * const &p = (int *)0x00000000;
+  1c:	mov	r3, #0
+  20:	str	r3, [fp, #-20]	; 创建匿名变量，因为const
+  24:	sub	r3, fp, #20     ; 取得匿名变量的地址
+  28:	str	r3, [fp, #-16]  ; p 指向 匿名变量
+  	// p是引用，本质是指针，所以解指针两次
+	// 将0x00000000写入匿名变量
+	*p = 0x00000000;
+  2c:	ldr	r3, [fp, #-16]  ; 第一次解指针, 因为p是引用
+  30:	ldr	r3, [r3]        ; 第二次解指针，因为使用 *p
+  34:	mov	r2, #0
+  38:	str	r2, [r3]        ; 将0x00000000写入匿名变量
+	int *a = p;
+  3c:	ldr	r3, [fp, #-16]  ; p是const做右值，将p直接改成 [fp, #-16]
+  40:	ldr	r3, [r3]
+  44:	str	r3, [fp, #-12]
+```
+### 
+```c
+int a = 10;
+int *const p = &a; // int * const = int *      // 正确
+int *&q = p;       // int ** pq = &p; 
+                   // int ** = int * const *   // 错误，const做右值，左值必须const
+				   // 应该改成
+int * const *pp = &p;
+int * const &qq = p;
+
+
+
+int a = 10;      
+const int *p = &a; // const int * = int *
+int *&q = p;       // int ** pq = &p;
+                   // int ** = const int **    // 错误
+                   // const int *&qq = p;
+
+int a = 10;        
+int *p = &a;       // int * = int *
+const int *&q = p; // const int ** = int **    // 错误
+                   // 改成
+int *&q = p;       // const int ** = int **
+
+此外一级指针是正确的
+int *a;
+const int *b = a;
+
+
+
+```
+
+
 
 ## 从常变量到常量
 C 中的const
@@ -250,7 +308,6 @@ int (&p)[5] = arr;
 
 ```
 ### 函数引用
-
 ```asm
 void func(int &a)
 {
@@ -301,6 +358,189 @@ int main()
   58:	ldr	r3, [r3]
   5c:	mov	r0, r3
   60:	bl	0 <_Z4funci>
+```
+
+# 内联函数
+## 内联函数和普通函数的区别
+内联函数在编译阶段确定，没有函数调用的开销，包括 实参压栈，pc 跳转，母函数fp, lr 压栈, 开辟栈帧，返回返回值，函数出栈。
+
+内联函数是直接在函数调用处展开函数
+
+内联函数没有对应符号
+
+# 函数默认参数
+## 默认值的顺序
+函数调用，实参从左往右，
+默认参数定义，形参从右往左给默认参数
+
+```c
+int func(int a, int b = 2, int c = 3)
+{
+  return 0;
+}
+
+func(1, 2, 3);
+func(1, 2);
+func(1);
+```
+## 声明和默认值
+函数定义可以给默认值，但推荐声明给默认值，且只有一次声明给默认值
+
+```c
+  int func(int a, int b = 2, int c = 3);
+
+  int main()
+  {
+
+      func(1, 2, 3);
+      func(1, 2);
+      func(1);
+
+      return 0;
+  }
+
+  int func(int a, int b, int c)
+  {
+      return 0;
+  }
+```
+
+错误
+```c
+  int func(int a, int b, int c);
+
+  int main()
+  {
+
+      func(1, 2, 3);
+>>    func(1, 2);
+>>    func(1);
+
+      return 0;
+  }
+
+  int func(int a, int b = 2, int c = 3)
+  {
+      return 0;
+  }
+```
+
+## 汇编
+```asm
+00000030 <main>:
+{
+  30:	push	{r4, lr}
+	func(1);
+  34:	mov	r2, #3
+  38:	mov	r1, #2
+  3c:	mov	r0, #1
+  40:	bl	0 <_Z4funciii>
+	func(4, 5);
+  44:	mov	r2, #3
+  48:	mov	r1, #5
+  4c:	mov	r0, #4
+  50:	bl	0 <_Z4funciii>
+	func();
+  54:	mov	r2, #3
+  58:	mov	r1, #2
+  5c:	mov	r0, #1
+  60:	bl	0 <_Z4funciii>
+}
+```
+# 函数重载
+函数名相同，参数列表不同（包括参数类型顺序，参数类型，参数数量）
+
+函数重载的原因是cpp编译器定义函数符号时，是根据函数名和参数列表确定，所以不同参数列表的同名函数有不同的链接符号
 
 
+## c和cpp互相调用
+c 调用cpp，无法直接调用，把cpp源码包裹在 `extern "C"`
+
+cpp 调用c, 无法直接调用，把c源码包裹在 `extern "C"`
+
+```c
+#ifdef __cplusplus
+// 如果编译器为g++，则按c规则编译
+// 即 cmp_int(int a, int b) 生成符号 cmp_int
+// 如果编译器为gcc, 则没有extern "C" {
+// 则gcc 直接编译代码
+extern "C" {
+#endif
+
+// 注意声明也要放在extern "C"中，因为声明也会生成链接符号，
+// 只是符号为 UNDEF 属性
+void cmp_int(int a, int b);
+
+void cmp_int(int a, int b)
+{}
+
+void cmp_char(const char *a, const char *b)
+{}
+
+void cmp_double(double a, double b)
+{}
+
+int main()
+{
+	cmp_int(1, 2);
+	cmp_double(1.2, 2.2);
+	cmp_char("1", "2");
+	return 0;
+}
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+# new delete
+## new 和 malloc的区别
+malloc 只分配内存，不进行初始化内存，通过返回值NULL判断是否成功, 需要类型强制转换。
+
+new 分配内存，可以进行内存初始化，默认通过抛出异常`bad_alloc`通知失败，不需要强制类型转换
+
+```cpp
+try {
+	int *p = new int(20);
+	// 下面这句没有意义，因为分配失败直接异常，
+	// 即不会运行到下面这句
+	// if (p == nullptr) {}
+	delete p;
+}
+catch (const bad_alloc & e) {
+	
+}
+
+int *p1 = (int *)malloc(sizeof(*p1));
+free(p1);
+```
+
+## 不同的new
+```cpp
+try {
+	int *p = new int(20);
+	int *arr = new int [10]{10};
+	int *arr3 = new int [10](); // 初始化为0
+	int *arr2 = new int [3]{1, 2};
+
+	int *p2 = new (nothrow)int(0); // 不抛出异常
+	if (p2 == nullptr) {
+
+	}
+
+	const int *p3 = new const int (40);
+
+	// 定位new，在指定内存上分配int大小的内存，
+	// 初始化为50
+	int data;
+	int *p4 = new (&data) int(50);
+
+
+	delete [] arr;
+	delete [] arr2;
+	delete p;
+}
+catch (const bad_alloc & e) {
+	
+}
 ```
