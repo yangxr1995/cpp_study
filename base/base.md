@@ -1,3 +1,114 @@
+# 编译原理
+## 预编译
+## 编译
+词法，语法分析，生成汇编
+
+编译后会根据源文件生成符号
+
+## 汇编
+
+### 链接符号
+```shell
+template<typename T>
+void cmp(T a, T b)
+{
+}
+
+template<>
+void cmp<const char *>(const char *a, const char *b) // FUNC 
+{													 // void cmp<const char *>(const char *, const char *)
+}													 // GLOBAL idx
+
+extern void fun1(); // NOTYPE fun1() GLOBAL UND
+extern int c;       // NOTYPE c GLOBAL UND
+extern int d;       // 不生成符号
+
+void func2() { } // FUNC func2() GLOBAL idx
+
+static void func3() { } // FUNC func3() LOCAL idx
+
+int a;  // OBJECT a GLOBAL idx
+static int b; //  OBJECT b LOCAL idx
+
+int main()
+{
+	int aa = 0;  // 不生成符号，生成代码
+				 // mov r3, #0
+				 // str r3, [fp, #-8]
+
+	cmp<int>(1, 2); // FUNC 
+					// int cmp<int>(int, int) 
+					// WEAK
+					// idx
+
+	cmp(1.0, 2.0);  // FUNC
+					// int cmp(double)(double, double)
+					// WEAK
+					// idx
+
+	fun1();         // NOTYPE
+					// fun1()
+					// GLOBAL
+					// UND
+
+	c++;            // NOTYPE
+					// c
+					// GLOBAL
+					// UND
+
+	return 0;
+}
+```
+
+```shell
+root@u22:/mnt/share/cpp_study/test# readelf -s main.o
+
+Symbol table '.symtab' contains 16 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS main.cpp
+     2: 0000000000000000     0 SECTION LOCAL  DEFAULT    3 .text
+     3: 000000000000001e    11 FUNC    LOCAL  DEFAULT    3 _ZL5func3v
+     4: 0000000000000004     4 OBJECT  LOCAL  DEFAULT    6 _ZL1b
+     5: 0000000000000000     0 SECTION LOCAL  DEFAULT    7 .text._Z3cmpIiEvT_S0_
+     6: 0000000000000000     0 SECTION LOCAL  DEFAULT    8 .text._Z3cmpIdEvT_S0_
+     7: 0000000000000000     0 SECTION LOCAL  DEFAULT    9 .rodata
+     8: 0000000000000000    19 FUNC    GLOBAL DEFAULT    3 _Z3cmpIPKcEvT_S2_
+     9: 0000000000000013    11 FUNC    GLOBAL DEFAULT    3 _Z5func2v
+    10: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    6 a
+    11: 0000000000000029    90 FUNC    GLOBAL DEFAULT    3 main
+    12: 0000000000000000    17 FUNC    WEAK   DEFAULT    7 _Z3cmpIiEvT_S0_
+    13: 0000000000000000    21 FUNC    WEAK   DEFAULT    8 _Z3cmpIdEvT_S0_
+    14: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND _Z4fun1v
+    15: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND c
+
+```
+
+readelf 解释 :
+
+- Bind（绑定）：Bind字段表示符号的绑定属性，它指示符号的可见性和链接类型。以下是常见的绑定属性：
+ - LOCAL（局部）：符号只在定义它的目标文件中可见，其他目标文件无法引用它。
+ - GLOBAL（全局）：符号可以被其他目标文件引用，可以在整个程序中共享。
+ - WEAK（弱）：与全局符号类似，可以被其他目标文件引用。但是，链接器在有多个定义的情况下不会合并弱符号，而是选择一个默认版本。
+- Vis（可见性）：Vis字段表示符号的可见性属性，它指示符号在链接时的可见范围。以下是常见的可见性属性：
+ - DEFAULT（默认）：符号在链接时可以被其他目标文件引用。
+ - HIDDEN（隐藏）：符号在链接时只能被定义它的目标文件引用，其他目标文件无法引用它。
+ - INTERNAL（内部）：符号在链接时只能被同一目标文件中的其他符号引用，对于其他目标文件是不可见的。
+- Ndx（索引）：Ndx字段表示符号的节索引，它指示符号所属的节（section）。节是目标文件中的一段数据，符号在特定的节中定义或引用。节索引指示了符号所属的节的位置。
+
+
+### C++符号
+C++符号根据 作用域+模板参数列表+函数名+参数列表组成
+
+使用 c++filt 可以将根据符号得到真正的函数类型
+```shell
+root@u22:/mnt/share/cpp_study/test# c++filt _Z3cmpIiEiT_S0_
+int cmp<int>(int, int)
+```
+
+## 链接
+## 加载
+
 # 函数调用
 ```asm
 #include <iostream>
@@ -685,5 +796,75 @@ class stu {
 
 ```
 
-## 构造和析构
+# 模板
+```cpp
+#include <iostream>
+#include <string.h>
+using namespace std;
 
+/*
+ * 1. 函数模板的实例化
+ * 2. 类型推演
+ * 3. 特例模板函数
+ * 4. 模板函数在编译阶段实例化，所以实现和调用分开会导致符号未定义，所以通常写在头文件，并#include使用
+ * 5. 模板函数和普通函数
+ */
+
+template<typename T>
+int cmp(T a, T b)  // 生成 WEAK 链接符号, 对于LOCAL和GLOBAL都可以覆盖此符号
+{
+	cout << "template cmp" << endl;
+	return a > b;
+}
+
+// 特例模板函数
+// 当使用模板函数特例，不论函数是否被引用，
+// 都会生成 GLOBAL 或 LOCAL 的 链接符号 int cmp<const char *>(const char *,const char *)
+template<>
+int cmp<const char *>(const char *a, const char *b)
+{
+	return strcmp(a, b);
+}
+
+// 显示告诉编译器进行模板实例化 
+template int cmp(bool, bool); // int cmp<bool>(bool, bool)
+
+
+// 有普通函数声明，会生成符号  GLOBAL cmp(int, int) UND
+// 在编译函数调用时，因为已经有有了适当的符号，就不会进行模板实例化
+extern int cmp(int a, int b);
+
+#if 0
+// 注意 普通函数生成的符号为 cmp(int, int) GLOBAL, 没有返回值
+int cmp(int a, int b)
+{
+	cout << "normal cmp" << endl;
+	return a > b;
+}
+#endif
+
+int main()
+{
+	// 当编译器自上而下扫描到模板的调用处，
+	// 根据模板实参，将模板函数实例化，
+	// 生成对应代码
+	// cmp<int>(3, 4); // --> 生成 int cmp<int>(int, int) 链接符号  WEAK
+	//
+	cmp(3, 4); // --> 生成 int cmp<int>(int, int) 链接符号  WEAK
+
+	// 若没有显示指定模板实参，
+	// 编译器自动推演模板实参类型
+//	cmp(3.0, 4.0);  // --> 生成 int cmp<double>(double, double) 链接符号 WEAK
+
+	// 下面情况无法推演后找不到对于函数模板
+	// cmp(3.0, 4);
+
+	// 当使用模板原有比较逻辑是错误的
+	// 需要实现模板特例化
+//	cmp("aaa", "bbb");
+
+
+
+	return 0;
+}
+```
