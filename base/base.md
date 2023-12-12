@@ -797,6 +797,7 @@ class stu {
 ```
 
 # 模板
+## 模板函数
 ```cpp
 #include <iostream>
 #include <string.h>
@@ -868,3 +869,146 @@ int main()
 	return 0;
 }
 ```
+
+模板非类型参数
+```c
+template<typename T>
+void myswap(T &a, T &b)
+{
+	T tmp;
+
+	tmp = a;
+	a = b;
+	b = tmp;
+}
+
+/*
+ * 模板非类型参数，用于做常量
+ * 非类型参数只能用：整形，指针，引用，double
+ */
+template<typename T, int SIZE>
+void sort(T *arr)
+{
+	int i, j;
+	bool is_ok;
+
+	for (i = 0; i < SIZE - 1 ; i ++) {
+		is_ok = true;
+		for (j = 0; j < SIZE - 1 - i; j++) {
+			if (arr[j] > arr[j + 1]) {
+				myswap(arr[j], arr[j + 1]);
+				is_ok = false;
+			}
+		}
+	}	
+}
+
+```
+
+## 模板类
+### stack
+```c
+template<typename T>
+class stack {
+	public:
+		~stack()
+		{
+			delete [] data;
+		}
+
+		stack() 
+			:data(nullptr), size(0), len(0)
+		{}
+
+		stack(const stack<T> &s)
+		{
+			int i;
+
+			data = new T[s.size];
+			size = s.size;
+			len = s.len;
+			for (i = 0; i < s.len; i++)
+				data[i] = s.data[i];
+		}
+
+		stack<T>& operator=(const stack<T> &s)
+		{
+			int i;
+
+			if (this == &s)
+				return *this;
+
+			delete[] data;
+			data = new T[s.size];	
+			size = s.size;
+			len = s.len;
+			for (i = 0; i < s.len; i++)
+				data[i] = s.data[i];
+		}
+
+		void push(T obj)
+		{
+			if (len == size)	
+				expand();
+			data[len++] = obj;
+		}
+
+		T pop()
+		{
+			if (len <= 0)
+				throw "stack is empty";
+			return data[len-- - 1];
+		}
+		T top() const;
+
+	private:
+		T *data;
+		int size;
+		int len;
+
+		void expand() {
+			T *tmp;
+
+			tmp = data;
+			size *= 2;
+			data = new T[size];
+			for (int i = 0; i < len; i++)
+				data[i] = tmp[i];
+
+			delete [] tmp;
+		}
+};
+
+template<typename T>
+T stack<T>::top() const
+{
+	if (len <= 0)
+		throw "stack is empty";
+	return data[len - 1];
+}
+
+
+
+void func()
+{
+	stack<int> s;
+
+	s.push(1);
+	s.push(2);
+	s.push(3);
+	s.push(4);
+
+	cout << "top" << s.top() << endl;
+	cout << "pop" << s.pop() << endl;
+
+	stack<int> s2 = s;
+
+	cout << "top" << s2.top() << endl;
+
+	cout << "pop" << s.pop() << endl;
+	cout << "pop" << s.pop() << endl;
+	cout << "pop" << s.pop() << endl;
+}
+```
+
+### vector
