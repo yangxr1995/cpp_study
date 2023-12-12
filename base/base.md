@@ -544,3 +544,146 @@ catch (const bad_alloc & e) {
 	
 }
 ```
+# 类
+## 指向类成员的指针
+```c
+class stu {
+	public:
+		int age;
+		const char *name;
+		char **pname;
+		void func() { cout << "hello world" << endl; }
+		static int a;
+};
+
+int stu::a = 10;
+
+stu s;
+s.age = 10;
+int stu::*p = &stu::age;
+// 将 int stu::* -> int stu::*
+s.*p = 20;
+// s.(*p) = 20; // 错误，s.的优先级应该更高
+cout << s.*p << endl;
+
+const char *stu::*p2 = &stu::name;
+//const char stu::*p2 = &stu::name;
+// 错误无法 const char * stu:: * -> const char stu:: *
+
+s.*p2 = "hello";
+cout << s.*p2 << endl;
+
+char **stu::*p3 = &stu::pname;
+// char **stu::* -> char **stu::*
+
+void (stu::*p4)() = &stu::func;
+// 将 void (stu::*)(void) -> void (stu::*)(void)
+(s.*p4)();
+
+int *p5 = &stu::a;
+cout << "p5 " << *p5 << endl;
+
+
+	stu *s = new stu;
+
+	int stu::*p1 = &stu::age;
+	const char *stu::*p2 = &stu::name;
+	char **stu::*p3 = &stu::pname;
+	void (stu::*p4)() = &stu::func;
+	int *p5 = &stu::a;
+
+	(s->*p4)();
+
+	delete s;
+
+
+```
+
+指向类成员的指针，本质上存放偏移量
+```asm
+	int stu::*p = &stu::age;
+  24:	mov	r3, #0
+  28:	str	r3, [fp, #-32]	; 0xffffffe0
+
+	char *stu::*p2 = &stu::name;
+  40:	mov	r3, #4
+  44:	str	r3, [fp, #-28]	; 0xffffffe4
+
+	char **stu::*p3 = &stu::pname;
+  5c:	mov	r3, #8
+  60:	str	r3, [fp, #-24]	; 0xffffffe8
+
+
+# 使用
+	s.*p2 = "hello";
+  48:	ldr	r3, [fp, #-28]	; 获得存放的偏移量值
+  4c:	sub	r2, fp, #20     ; 获得s对象的地址
+  50:	add	r3, r2, r3      ; s对象的地址加偏移量得到属性的地址
+  54:	ldr	r2, [pc, #56]	; 获得 "hello"
+  58:	str	r2, [r3]        ; 将"hello"的地址写入属性的内存空间
+```
+
+## 类的各种属性和方法 
+### 常方法
+
+常方法的this指针是 `const stu *const this` 所以属性只能读，通常用于实现类读接口的实现。
+
+方便用户传入const类型的参数
+
+```c
+class stu {
+
+	// 两个show构成函数重载 
+	void show() {
+		// this : stu * const this;
+	}	
+	void show() const  {
+		// this : const stu * const this;
+	}
+};
+
+```
+
+### 静态属性
+```c
+class stu{
+	public:
+		static int a;
+		// 静态成员方法，只能访问静态属性
+		static void func() { a++;}
+}
+// 在编译时定义。静态属性属于类，不属于成员
+int stu::a = 10;
+```
+## 初始化列表
+```c
+class A {
+	public:
+	A(int a, int b)
+		:a(a), b(b){
+	}
+
+	int a;
+	int b;
+};
+
+class stu {
+	public:
+		stu(int a, int b, int c)
+			:a(a, b), age(c) // A a(a, b); int age = c 
+							 // 先调用初始化列表
+							 // 初始化列表的执行顺序为成员定义顺序
+		{
+			// 再调用自己的构造函数
+			// age在这里初始化，则为
+			// age = c;
+
+		}
+		int age;
+		A a;
+};
+
+```
+
+## 构造和析构
+
