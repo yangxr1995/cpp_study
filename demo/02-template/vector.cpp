@@ -123,6 +123,43 @@ public:
 		return (_last - _first);
 	}
 
+	class iterator {
+	public:
+		iterator(T *p)
+		:_p(p)
+		{}
+
+		bool operator!=(const iterator &it) const
+		{
+			return _p != it._p;
+		}
+
+		iterator operator++() 
+		{
+			_p++;
+			return *this;
+		}
+
+		T operator*() {
+			return *_p;
+		}
+
+		const T operator*() const {
+			return *_p;
+		}
+
+	private:
+		T *_p;
+	};
+
+	iterator begin() const {
+		return iterator(_first);
+	}
+
+	iterator end() const {
+		return iterator(_end);
+	}
+
 private:
 	void expand() {
 		unsigned int cap, n;
@@ -197,6 +234,20 @@ void func()
 
 int main()
 {
-	func();
+	//func();
+
+	vector<int>v_int;
+
+	for (int i = 0; i < 10; i++)
+		v_int.push_back(i);
+
+	for (auto it = v_int.begin(); it != v_int.end(); ++it)
+		cout << *it << " ";
+	cout << endl;
+
+	for (int i: v_int)
+		cout << i << " ";
+	cout << endl;
+
 	return 0;
 }
