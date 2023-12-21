@@ -1072,3 +1072,30 @@ test aa = back(1, 2);
 所以aa可以直接使用
 
 
+# 继承
+继承的本质是代码的复用
+
+不论使用何种继承方式，子类都会得到父类的全部成员
+
+## 继承和访问限定
+
+继承和访问限定遵循一下规律：
+
+- 被继承的成员的访问限定不超过继承访问的访问限定
+ - 访问限定的大小为 public > protected > private
+- 被继承的private不论何种继承方式，子类都不可见
+- 只有public成员可以对外部访问
+- protected和private唯一区别在于继承
+
+| 继承方式 | 基类访问限定 | 派生类访问限定 | 外部访问限定 |
+| ------ | ---| --- | --- |
+| public | public | public | Y |
+| public | protected | protected | N |
+| public | private | 存在但不可见 | N |
+| protected | public | protected | N |
+| protected | protected | protected | N |
+| protected | private | 存在但不可见 | N |
+| private | public | private | N |
+| private | protected | private | N |
+| private | private | 存在但不可见 | N |
+
