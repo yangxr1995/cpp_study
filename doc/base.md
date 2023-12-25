@@ -1072,12 +1072,13 @@ test aa = back(1, 2);
 所以aa可以直接使用
 
 
-# 继承
+# oop
+## 继承
 继承的本质是代码的复用
 
 不论使用何种继承方式，子类都会得到父类的全部成员
 
-## 继承和访问限定
+### 继承和访问限定
 
 继承和访问限定遵循一下规律：
 
@@ -1099,18 +1100,423 @@ test aa = back(1, 2);
 | private | protected | private | N |
 | private | private | 存在但不可见 | N |
 
-## 继承和构造析构
+### 继承和构造析构
 - 构造：基类 -> 组合类(按照定义顺序) -> 自己
 - 析构: 自己 -> 组合类(按照定义顺序取反) -> 基类
 
-## 方法的重载隐藏覆盖
+### 方法的重载隐藏覆盖
 - 重载：作用域相同，函数名相同，参数列表不同，所以基类和子相同函数名的方法不构成重载
 - 隐藏：当子类定义了func方法，则隐藏基类的所有func方法
 - 覆盖: 和动态相关
 
-## 基类对象和子类对象的互相转换
+### 基类对象和子类对象的互相转换
 不论时对象转换，还是指向对象的指针转换，只允许子类转换为基类。
 
 特别是基类指针指向子类对象，只能访问基类部分的属性。
 
 ## 虚函数表，静态绑定，动态绑定 
+### 虚函数表的创建和vptr
+
+![./pic/2.jpg]
+
+1. 类定义有virtual修饰的函数，则会生成该类的vftable.
+
+2. 子类即使没有显示声明虚函数，但子类继承的基类，所以子类也有vptr vftable，并且子类的vftable里记录的虚函数值为基类的vftable虚函数值
+
+3. 若子类定义了相关虚函数，则会重写子类vftable中相关虚函数的地址，也就会覆盖从基类继承的虚函数地址
+
+4. 即使子类没有显示使用virtual关键字，只要函数名，返回值，参数列表和继承的函数相同，则也被当作虚函数重写
+
+当基类定义了虚函数，但是子类没有重写虚函数，子类依旧会继承虚函数
+```asm
+00010b0c <vtable for Derive>:
+   10b0c:	00000000 00010b34 0001093c 00010a20     ....4...<... ...
+   10b1c:	00010a5c                                \...
+
+00010b20 <vtable for Base>:
+   10b20:	00000000 00010b48 0001093c 00010980     ....H...<.......
+   10b30:	000109b4                                ....
+```
+可以发现子类也有vtable，并且虚函数列表字段内容相同。
+
+
+
+### 虚函数的调用
+
+在调用时，若函数为虚函数，则使用动态绑定，否则使用静态绑定。
+
+动态绑定原理是
+- 根据对象获得对象的vptr指针
+- 根据vptr指针获得对应类的vftable
+- 根据偏移值和vftable基地址得到对应虚函数的地址
+- 调用虚函数
+
+```asm
+	Sub s;	
+   1082c:	ldr	r3, [pc, #100]	; 10898 <main+0x84>
+   10830:	str	r3, [fp, #-16]
+	Base *b;
+
+	b = &s;
+   10834:	sub	r3, fp, #16
+   10838:	str	r3, [fp, #-12]
+
+	b->show();
+   1083c:	ldr	r3, [fp, #-12]  // b指针指向s对象，通过指针取s对象的vptr属性的地址
+   10840:	ldr	r3, [r3]        // 从vptr指针获得vftable的地址
+   10844:	ldr	r3, [r3]        // 从vftable获得 void show()虚函数的地址
+   10848:	ldr	r0, [fp, #-12]  // 传递this做参数
+   1084c:	blx	r3              // 调用 Sub::show()
+	b->show(1);
+   10850:	ldr	r3, [fp, #-12]  // b指针指向s对象，通过指针取s对象的vptr属性的地址
+   10854:	ldr	r3, [r3]        // 从vptr指针获得vftable的地址
+   10858:	add	r3, r3, #4      // 地址偏移4字节，获得 void show(int) 虚函数的地址的地址
+   1085c:	ldr	r3, [r3]        // 获得void show (int)虚函数的地址
+   10860:	mov	r1, #1          // 参数1
+   10864:	ldr	r0, [fp, #-12]  // 参数this
+   10868:	blx	r3              // 调用 Base::show(int) , 因为这是从基类继承来的，且没有被覆盖
+```
+
+```cpp
+class Base {
+	public:
+		virtual void show() {
+			cout << "Base::show()" << endl;
+		}
+		virtual void show(int i) {
+			cout << "Base::show(int i)" << endl;
+		}
+		void func() {}
+};
+
+class Sub : public Base {
+};
+
+class Sub2 : public Sub {
+};
+
+int main()
+{
+	Sub *s;	
+	Sub2 s2;
+	Base *b, bb;
+
+	s = &s2;
+	s->show();
+	s->func();
+```
+
+
+```asm
+	Sub *s;	
+	Sub2 s2;
+   1082c:	ldr	r3, [pc, #96]	; 10894 <main+0x80>
+   10830:	str	r3, [fp, #-20]	; 0xffffffec
+	Base *b, bb;
+   10834:	ldr	r3, [pc, #92]	; 10898 <main+0x84>
+   10838:	str	r3, [fp, #-16]
+
+	s = &s2;
+   1083c:	sub	r3, fp, #20
+   10840:	str	r3, [fp, #-12]
+	s->show();    // Sub类的show函数为virtual，所以使用动态绑定 
+   10844:	ldr	r2, [fp, #-12]
+   10848:	ldr	r3, [fp, #-12]
+   1084c:	ldr	r3, [r3]
+   10850:	ldr	r3, [r3]
+   10854:	mov	r0, r2
+   10858:	blx	r3
+	s->func();   // Sub类的func为普通函数，所以使用静态绑定
+   1085c:	ldr	r3, [fp, #-12]
+   10860:	mov	r0, r3
+   10864:	bl	109a8 <Base::func()>
+```
+
+### vptr和构造函数
+![./pic/3.jpg]
+
+调用基类构造函数时，vptr指向基类的vtable中的虚函数表，调用自己的构造函数时，vptr才指向本类vtable中的虚函数表。
+
+注意构造函数中可以使用多态，因为本类vptr的绑定紧跟在基类构造返回后.
+```cpp
+0001095c <Sub::Sub()>:
+		Sub() {
+   1095c:	e92d4800 	push	{fp, lr}
+   10960:	e28db004 	add	fp, sp, #4
+   10964:	e24dd010 	sub	sp, sp, #16
+   10968:	e50b0010 	str	r0, [fp, #-16]
+   1096c:	e51b3010 	ldr	r3, [fp, #-16]
+   10970:	e1a00003 	mov	r0, r3
+   10974:	ebffffda 	bl	108e4 <Base::Base()>
+   10978:	e59f2030 	ldr	r2, [pc, #48]	; vptr指向本类vtable
+   1097c:	e51b3010 	ldr	r3, [fp, #-16]
+   10980:	e5832000 	str	r2, [r3]
+			b = this;
+   10984:	e51b3010 	ldr	r3, [fp, #-16]
+   10988:	e50b3008 	str	r3, [fp, #-8]
+			b->show();
+   1098c:	e51b3008 	ldr	r3, [fp, #-8]  ; 多态调用
+   10990:	e5933000 	ldr	r3, [r3]
+   10994:	e5933000 	ldr	r3, [r3]
+   10998:	e51b0008 	ldr	r0, [fp, #-8]
+   1099c:	e12fff33 	blx	r3
+		}
+   109a0:	e51b3010 	ldr	r3, [fp, #-16]
+   109a4:	e1a00003 	mov	r0, r3
+   109a8:	e24bd004 	sub	sp, fp, #4
+   109ac:	e8bd8800 	pop	{fp, pc}
+   109b0:	00010a90 	.word	0x00010a90
+```
+
+
+### 哪些函数不能实现成虚函数
+1. 构造函数不能实现为虚函数
+
+因为多态依赖vptr指向对象对应类的vtable，而这个操作在对象的构造函数中完成，
+
+所以构造函数若做虚函数，则vptr还没有指向正确的vtable导致无法调用正确的构造函数。
+
+2. 静态方法不能实现为虚函数
+
+因为多态依赖vptr指针，vptr存储在确定的对象里，而静态方法不需要对象
+
+### 虚析构函数
+
+如果要使用多态，则基类析构函数推荐使用虚函数，因为若不为虚函数，则可能漏掉调用子类的析构
+
+```cpp
+	Base *b = new Sub;
+   10864:	e3a00004 	mov	r0, #4
+   10868:	ebffff97 	bl	106cc <operator new(unsigned int)@plt>
+   1086c:	e1a03000 	mov	r3, r0
+   10870:	e1a04003 	mov	r4, r3
+   10874:	e1a00004 	mov	r0, r4
+   10878:	eb00005a 	bl	109e8 <Sub::Sub()>
+   1087c:	e50b4010 	str	r4, [fp, #-16]
+	delete b;
+   10880:	e51b4010 	ldr	r4, [fp, #-16]        ; 获得指针b
+   10884:	e3540000 	cmp	r4, #0                ; 如果b == 0 则异常
+   10888:	0a000003 	beq	1089c <main+0x44>     
+   1088c:	e1a00004 	mov	r0, r4                ; 调用Base的析构
+   10890:	eb000047 	bl	109b4 <Base::~Base()>
+   10894:	e1a00004 	mov	r0, r4
+   10898:	ebffff97 	bl	106fc <operator delete(void*)@plt>
+```
+
+```cpp
+	Base *b = new Sub;
+   10864:	e3a00004 	mov	r0, #4
+   10868:	ebffff97 	bl	106cc <operator new(unsigned int)@plt>
+   1086c:	e1a03000 	mov	r3, r0
+   10870:	e1a04003 	mov	r4, r3
+   10874:	e1a00004 	mov	r0, r4
+   10878:	eb000068 	bl	10a20 <Sub::Sub()>
+   1087c:	e50b4010 	str	r4, [fp, #-16]
+	delete b;
+   10880:	e51b3010 	ldr	r3, [fp, #-16]
+   10884:	e3530000 	cmp	r3, #0
+   10888:	0a000005 	beq	108a4 <main+0x4c>
+   1088c:	e51b3010 	ldr	r3, [fp, #-16]   ; 获得vptr
+   10890:	e5933000 	ldr	r3, [r3]         ; 获得vtable中的虚函数表
+   10894:	e2833008 	add	r3, r3, #8       ; 虚函数表基地址偏移8字节得到虚函数的指针
+   10898:	e5933000 	ldr	r3, [r3]         ; 获得虚函数
+   1089c:	e51b0010 	ldr	r0, [fp, #-16]
+   108a0:	e12fff33 	blx	r3               ; 调用虚析构函数
+```
+
+### 是不是所有虚函数的调用都是动态绑定？
+不是，构造函数中直接调用虚函数，使用静态绑定
+
+必须由指针或引用访问虚函数，才为动态绑定 ,否则是静态绑定
+
+### virtual方法和默认参数
+```cpp
+class Base {
+	public:
+		virtual void show(int i = 10) { cout << "Base::show " << i << endl;}
+		virtual ~Base() {}
+};
+
+class Derive: public Base {
+	public:
+		virtual void show(int i = 20) { cout << "Derive::show " << i << endl;}
+		virtual ~Derive() {}
+}; 
+
+	Base *p = new Derive;
+	p->show();
+	delete p;
+```
+注意 打印:
+```shell
+Derive::show 10
+```
+
+注意默认参数使用的是基类的默认参数。
+```asm
+	p->show();
+   10838:	e51b3010 	ldr	r3, [fp, #-16]
+   1083c:	e5933000 	ldr	r3, [r3]
+   10840:	e5933000 	ldr	r3, [r3]
+   10844:	e3a0100a 	mov	r1, #10   ; 使用默认参数做参数
+   10848:	e51b0010 	ldr	r0, [fp, #-16]
+   1084c:	e12fff33 	blx	r3
+```
+
+原因是，使用默认参数传参，是编译时确定，编译器无法确定动态绑定那个函数，
+
+所以编译器完全按照调用时当时的对象是什么类型，就使用对应类型定义的函数声明的默认参数。
+
+### virtual 和访问域控制
+```cpp
+class Base {
+	public:
+		virtual void show(int i = 10) { cout << "Base::show " << i << endl;}
+		virtual ~Base() {}
+};
+
+class Derive: public Base {
+	private:
+		virtual void show(int i = 20) { cout << "Derive::show " << i << endl;}
+	public:
+		virtual ~Derive() {}
+}; 
+
+int main()
+{
+	Base *p = new Derive;
+
+	p->show();
+	delete p;
+
+	return 0;
+}
+```
+虽然Derive::show是private，但是依旧可以访问，
+
+因为访问域是在编译阶段判定，编译器发现 p 是 Base，且`Base::show`是 public，所以可以调用。运行阶段找到`Derive::show`，并运行
+
+## 抽象类
+### 什么时候定义抽象类
+1. 为了定义一个统一的接口
+
+2. 为了继承公共属性
+
+### 抽象类的特点
+1. 抽象类方法没有明确实现，只有接口定义 
+
+2. 抽象类不能定义对象，但可以定义指针和引用
+
+## 面试题
+### 1
+```cpp
+class Animal {
+	public:
+		Animal(const char *name) : _name(name) {}
+		virtual void bark() = 0;
+		virtual ~Animal() {}
+	protected:
+		string _name;
+};
+
+class Dog : public Animal {
+	public:
+		Dog(const char *name) : Animal(name) {}
+		void bark() {
+			cout << _name << " : wang wang !" << endl;
+		}
+		~Dog() {}
+};
+
+class Cat : public Animal {
+	public:
+		Cat(const char *name) : Animal(name) {}
+		void bark() {
+			cout << _name << " : miao miao !" << endl;
+		}
+		~Cat() {}
+};
+
+int main()
+{
+	Dog d("Jim");
+	Cat c("Tom");
+
+	int *p = (int *)&d;
+	int *p2 = (int *)&c;
+	int tmp;
+
+	tmp = *p;
+	*p = *p2;
+	*p2 = tmp;
+
+	Animal *a;
+	a = &d;
+	a->bark(); // Jim : miao miao !
+	a = &c;
+	a->bark(); // Tom : wang wang !
+
+	return 0;
+}
+```
+
+### 2
+```cpp
+class Base {
+	public:
+		virtual void show(int i = 10) { cout << "Base::show " << i << endl;}
+		virtual ~Base() {}
+};
+
+class Derive: public Base {
+	private:
+		virtual void show(int i = 20) { cout << "Derive::show " << i << endl;}
+	public:
+		virtual ~Derive() {}
+}; 
+
+int main()
+{
+	Base *p = new Derive;
+
+	p->show(); // 能否调用
+	delete p;
+
+	return 0;
+}
+```
+
+### 3.
+```cpp
+class Base {
+	public:
+		Base() {
+			memset(this, 0x0, sizeof(*this));
+		}
+		virtual void show() { cout << "Base::show " << endl;}
+		virtual ~Base() {}
+};
+
+class Derive: public Base {
+	public:
+		virtual void show() { cout << "Derive::show " << endl;}
+		virtual ~Derive() {}
+}; 
+
+int main()
+{
+    // 哪个可以正常调用，为什么？
+
+	// 1
+	Base *p = new Derive;
+	p->show();
+	delete p;
+
+	// 2
+	p = new Base;
+	p->show();
+	delete p;
+
+	return 0;
+}
+```
