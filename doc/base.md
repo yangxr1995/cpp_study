@@ -1117,7 +1117,7 @@ test aa = back(1, 2);
 ## 虚函数表，静态绑定，动态绑定 
 ### 虚函数表的创建和vptr
 
-![./pic/2.jpg]
+![](./pic/2.jpg)
 
 1. 类定义有virtual修饰的函数，则会生成该类的vftable.
 
@@ -1233,7 +1233,7 @@ int main()
 ```
 
 ### vptr和构造函数
-![./pic/3.jpg]
+![](./pic/3.jpg)
 
 调用基类构造函数时，vptr指向基类的vtable中的虚函数表，调用自己的构造函数时，vptr才指向本类vtable中的虚函数表。
 
@@ -1396,6 +1396,12 @@ int main()
 
 因为访问域是在编译阶段判定，编译器发现 p 是 Base，且`Base::show`是 public，所以可以调用。运行阶段找到`Derive::show`，并运行
 
+### 基类指针指向子类对象的哪个域
+基类指针指向子类对象的首地址，第一个字段。
+
+因为偏移量是固定的
+
+
 ## 抽象类
 ### 什么时候定义抽象类
 1. 为了定义一个统一的接口
@@ -1519,4 +1525,391 @@ int main()
 
 	return 0;
 }
+```
+
+## 多重继承
+### 虚继承
+#### 多继承时，如果属性有二义性，则使用虚继承
+```cpp
+  class A {
+      public:
+          int m_a;
+          A() { m_a = 1; }
+  };
+
+  class B : virtual public A {
+      public:
+          int m_b;
+          B() { m_b = 1; }
+  };
+
+  class C : public B {
+      public:
+          int m_c;
+          C() { m_c = 1; }
+  };
+```
+如果不加 virtual ，则会编译报错
+
+#### 被虚继承时的对象内存布局
+![](./pic/6.jpg)
+B虚继承A，B中添加vbptr指向vbtable，并且B中A的属性移动到高地址，C继承B，C的属性在B的属性后
+
+虚继承后，对象内存增加一个指针
+
+### 菱形继承
+菱形继承是设计不合理的体现
+
+菱形继承中基类二义性的问题使用虚继承解决。
+
+需要注意构造函数
+```cpp
+  class A {
+      public:
+          int m_a;
+          A(int a) :m_a(a) {}
+  };
+
+  class B : virtual public A {
+      public:
+          int m_b;
+          B(): A(0) { m_b = 1; }
+  };
+
+  class C : public B {
+      public:
+          int m_c;
+          C(): A(0) { m_c = 1; } // C类必须直接调用A的构造，不能通过B的构造间接构造A
+  };
+```
+
+导致上面情况的原因是：
+
+```asm
+  00010a44 <C::C()>:
+          C() { m_c = 1; }
+     10a44:   e92d4800    push    {fp, lr}
+     10a48:   e28db004    add fp, sp, #4
+     10a4c:   e24dd008    sub sp, sp, #8
+     10a50:   e50b0008    str r0, [fp, #-8]
+     10a54:   e51b3008    ldr r3, [fp, #-8]
+     10a58:   e283300c    add r3, r3, #12
+     10a5c:   e1a00003    mov r0, r3
+     10a60:   ebffffc7    bl  10984 <A::A()>  // 当C继承的类中有通过虚继承获得的，则会直接调用虚继承对应的类的构造
+     10a64:   e51b3008    ldr r3, [fp, #-8]
+     10a68:   e59f2030    ldr r2, [pc, #48]   ; 10aa0 <C::C()+0x5c>
+     10a6c:   e1a01002    mov r1, r2
+     10a70:   e1a00003    mov r0, r3
+     10a74:   ebffffce    bl  109b4 <B::B()>  // 调用中间类的构造，这个构造是特别的
+     10a78:   e59f2024    ldr r2, [pc, #36]   ; 10aa4 <C::C()+0x60>
+     10a7c:   e51b3008    ldr r3, [fp, #-8]
+     10a80:   e5832000    str r2, [r3]
+     10a84:   e51b3008    ldr r3, [fp, #-8]
+
+    // C中调用的B的构造是特别的，这个B构造中没有调用A的构造
+  000109b4 <B::B()>:
+          B() { m_b = 1; }
+     109b4:   e52db004    push    {fp}        ; (str fp, [sp, #-4]!)
+     109b8:   e28db000    add fp, sp, #0
+     109bc:   e24dd00c    sub sp, sp, #12
+     109c0:   e50b0008    str r0, [fp, #-8]
+     109c4:   e50b100c    str r1, [fp, #-12]
+     109c8:   e51b300c    ldr r3, [fp, #-12]
+     109cc:   e5932000    ldr r2, [r3]
+     109d0:   e51b3008    ldr r3, [fp, #-8]
+     109d4:   e5832000    str r2, [r3]
+     109d8:   e51b3008    ldr r3, [fp, #-8]
+     109dc:   e3a02001    mov r2, #1
+     109e0:   e5832004    str r2, [r3, #4]
+     109e4:   e51b3008    ldr r3, [fp, #-8]
+     109e8:   e1a00003    mov r0, r3
+     109ec:   e28bd000    add sp, fp, #0
+     109f0:   e49db004    pop {fp}        ; (ldr fp, [sp], #4)
+     109f4:   e12fff1e    bx  lr
+
+    // g++另外生成了一段B的构造，这个构造中调用了A的构造，并且设置vbptr
+    // 对应 B类定义b对象，会调用下面的构造
+  000109f8 <B::B()>:
+     109f8:   e92d4800    push    {fp, lr}
+     109fc:   e28db004    add fp, sp, #4
+     10a00:   e24dd008    sub sp, sp, #8
+     10a04:   e50b0008    str r0, [fp, #-8]
+     10a08:   e51b3008    ldr r3, [fp, #-8]
+     10a0c:   e2833008    add r3, r3, #8
+     10a10:   e1a00003    mov r0, r3
+     10a14:   ebffffda    bl  10984 <A::A()>
+     10a18:   e59f2020    ldr r2, [pc, #32]   ; 10a40 <B::B()+0x48>
+     10a1c:   e51b3008    ldr r3, [fp, #-8]
+     10a20:   e5832000    str r2, [r3]
+     10a24:   e51b3008    ldr r3, [fp, #-8]
+     10a28:   e3a02001    mov r2, #1
+     10a2c:   e5832004    str r2, [r3, #4]
+     10a30:   e51b3008    ldr r3, [fp, #-8]
+     10a34:   e1a00003    mov r0, r3
+     10a38:   e24bd004    sub sp, fp, #4
+     10a3c:   e8bd8800    pop {fp, pc}
+     10a40:   00010b48    .word   0x00010b48
+```
+
+# C++类内存布局分析
+## 普通类
+```cpp
+class A {
+public:
+  void *m_p;
+  int m_a;
+  char m_c;
+  A() {
+      m_p = nullptr;
+      m_a = 0;
+      m_c = 0;
+  }
+};
+
+class B : public A{
+public:
+  int m_b;
+  B() {
+      m_b = 0;
+  }
+};
+
+```
+gdb 分析
+```
+p a
+$1 = {m_p = 0x0, m_a = 0, m_c = 0 '\000'}
+p b
+$2 = {<A> = {m_p = 0x0, m_a = 0, m_c = 0 '\000'}, m_b = 0}
+```
+
+g++分析
+```
+  Class A
+     size=16 align=8
+     base size=13 base align=8
+  A (0x0x7fab1e332cc0) 0
+
+  Class B
+     size=24 align=8
+     base size=20 base align=8
+  B (0x0x7fab1e354a28) 0
+  A (0x0x7fab1e332ea0) 0
+```
+
+内存布局
+
+![](./pic/4.jpg)
+
+可以发现对齐，一个类按多少字节对齐，默认是根据类中最大的属性。
+
+#### 访问虚继承部分的属性
+```cpp
+
+class A {
+        public:
+                int m_a;
+                A() { m_a = 1; }
+};
+
+class B : virtual public A {
+        public:
+                int m_b;
+                B() { m_b = 1; }
+};
+
+class C : public B {
+        public:
+                int m_c;
+                C() { m_c = 1; }
+};
+
+void func(B *p)
+{
+        cout << p->m_a << endl;
+}
+
+int main()
+{
+        C c;
+        B b;
+
+        func(&c);
+        func(&b);
+
+        return 0;
+}
+```
+
+上面示例中， func的形参 p无法使用固定偏移量，因为传B 和 传C的内存布局不同
+![](./pic/7.jpg)
+
+那么g++只有使用vbtable记录的偏移量来访问m_a
+```asm
+  void func(B *p)
+  {
+     10830:   e92d4800    push    {fp, lr}
+     10834:   e28db004    add fp, sp, #4
+     10838:   e24dd008    sub sp, sp, #8
+     1083c:   e50b0008    str r0, [fp, #-8]
+      cout << p->m_a << endl;                // A::m_a是被虚继承
+     10840:   e51b3008    ldr r3, [fp, #-8]  // 得到 vbptr
+     10844:   e5933000    ldr r3, [r3]       // 得到 vbtable
+     10848:   e243300c    sub r3, r3, #12    // 偏移固定值得到m_a相关偏移量的地址
+     1084c:   e5933000    ldr r3, [r3]       // 获得m_a的偏移量
+     10850:   e1a02003    mov r2, r3
+     10854:   e51b3008    ldr r3, [fp, #-8]  // 获得对象的基地址
+     10858:   e0833002    add r3, r3, r2     // 增加偏移量得到 m_a的地址
+     1085c:   e5933000    ldr r3, [r3]       // 获得 m_a
+     10860:   e1a01003    mov r1, r3
+     10864:   e59f001c    ldr r0, [pc, #28]   ; 10888 <func(B*)+0x58>
+     10868:   ebffffa8    bl  10710 <std::ostream::operator<<(int)@plt>
+     1086c:   e1a03000    mov r3, r0
+     10870:   e59f1014    ldr r1, [pc, #20]   ; 1088c <func(B*)+0x5c>
+     10874:   e1a00003    mov r0, r3
+     10878:   ebffff9b    bl  106ec <std::ostream::operator<<(std::ostream& (*)(std::ostream&))@plt>
+  }
+```
+
+可见访问虚继承的属性很浪费cpu
+
+## 虚基类
+```cpp
+  class A {
+  public:
+      void *m_p;
+      int m_a;
+      char m_c;
+      A() {
+          m_p = nullptr;
+          m_a = 0;
+          m_c = 0;
+      }
+      virtual void show() {}
+  };
+
+  class B : public A{
+  public:
+      int m_b;
+      B() {
+          m_b = 0;
+      }
+      void show() {}
+  };
+```
+gdb
+```
+(gdb) p a                                                                                               
+$5 = {_vptr.A = 0x555555754d70 <vtable for A+16>, m_p = 0x0, m_a = 0, m_c = 0 '\000'}                  
+(gdb) p b                                                                                             
+$6 = {<A> = {_vptr.A = 0x555555754d58 <vtable for B+16>, m_p = 0x0, m_a = 0, m_c = 0 '\000'}, m_b = 0}
+```
+g++
+```
+Vtable for A
+A::_ZTV1A: 3 entries
+0     (int (*)(...))0
+8     (int (*)(...))(& _ZTI1A)
+16    (int (*)(...))A::show
+
+Class A
+ size=24 align=8
+ base size=21 base align=8
+A (0x0x7fd354d6ccc0) 0
+  vptr=((& A::_ZTV1A) + 16)
+
+Vtable for B
+B::_ZTV1B: 3 entries
+0     (int (*)(...))0
+8     (int (*)(...))(& _ZTI1B)
+16    (int (*)(...))B::show
+
+Class B
+ size=32 align=8
+ base size=28 base align=8
+B (0x0x7fd354d8ea28) 0
+  vptr=((& B::_ZTV1B) + 16)
+A (0x0x7fd354d6cf00) 0
+    primary-for B (0x0x7fd354d8ea28)
+
+```
+反汇编信息
+```asm
+
+  000108b4 <vtable for B>:
+     108b4:   00000000 000108cc 00010820              ........ ...
+
+  000108c0 <vtable for A>:
+     108c0:   00000000 000108dc 000107b8              ............
+
+  000108cc <typeinfo for B>:
+     108cc:   00020ee0 000108d8 000108dc              ............
+
+  000108d8 <typeinfo name for B>:
+     108d8:   00004231                                1B..
+
+  000108dc <typeinfo for A>:
+     108dc:   00020eb4 000108e4                       ........
+
+  000108e4 <typeinfo name for A>:
+     108e4:                                            1A.
+```
+![](./pic/5.jpg)
+
+## 虚继承
+```cpp
+  class A {
+  public:
+      void *m_p;
+      int m_a;
+      char m_c;
+      A() {
+          m_p = nullptr;
+          m_a = 0;
+          m_c = 0;
+      }
+  };
+
+  class B : virtual public A{
+  public:
+      int m_b;
+      B() {
+          m_b = 0;
+      }
+  };
+
+```
+
+gdb
+```
+(gdb) p a                                                                                        
+$1 = {m_p = 0x0, m_a = 0, m_c = 0 '\000'}                                                       
+(gdb) p b                                                                                      
+$2 = {<A> = {m_p = 0x0, m_a = 0, m_c = 0 '\000'}, _vptr.B = 0x555555754d60 <VTT for B>, m_b = 0}
+```
+
+g++
+```
+  Class A
+     size=16 align=8
+     base size=13 base align=8
+  A (0x0x7f11a3edfcc0) 0
+
+  Vtable for B
+  B::_ZTV1B: 3 entries
+  0     16
+  8     (int (*)(...))0
+  16    (int (*)(...))(& _ZTI1B)
+
+  VTT for B
+  B::_ZTT1B: 1 entries
+  0     ((& B::_ZTV1B) + 24)
+
+  Class B
+     size=32 align=8
+     base size=12 base align=8
+  B (0x0x7f11a3f01a28) 0
+      vptridx=0 vptr=((& B::_ZTV1B) + 24)
+  A (0x0x7f11a3edfea0) 16 virtual
+        vbaseoffset=-24
 ```
