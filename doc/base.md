@@ -2016,3 +2016,105 @@ func(&b2);
 ```
 - 根据RTTI进行运行时类型转换检查
 - 如果支持类型转换则返回非nullptr
+
+# STL
+## 概览
+- 顺序容器
+    - vector
+    - deque
+    - list
+- 容器适配器
+    - stack
+    - queue
+    - priority_queue
+- 关联容器
+    - 无序关联容器
+        - unordered_set
+        - unordered_multiset
+        - unordered_map
+        - unordered_multimap
+    - 有序关联容器
+        - set
+        - multiset
+        - map
+        - multimap
+- 近容器
+    - 数组
+    - string
+    - bitset
+- 迭代器
+    - iterator
+    - const_iterator
+    - reverse_iterator
+    - const_reverse_iteraotr
+- 函数对象
+    - greater
+    - less
+- 泛型算法
+    - sort
+    - find
+    - find_if
+    - binary_search
+    - for_earch
+
+## 顺序容器
+### vector
+![](./pic/9.jpg)
+
+底层为动态数组，每次以原来大小进行2倍扩容
+* 动态数组
+* 二倍扩容
+* first指针指向数组首元素，导致只有push_back的效率为O(1)，其他效率都为O(n)
+
+1. insert
+```cpp
+push_back(T &obj);  // 末尾添加元素
+insert(vector<T>::iterator it, T &obj);  // 迭代器指定位置添加元素
+```
+
+2. delete
+```cpp
+pop_back(); //  末尾删除元素
+```
+
+3. modify
+
+4. select
+
+
+### deque
+![](./pic/8.jpg)
+
+* 底层是二维数组
+* 4K扩容
+* 使用两个指针first指针和last指针，指向已占用数组的首尾
+* first last从空闲空间的中间开始分配
+* 当二维空间消耗完了，就对一维数组进行扩容
+* push_back 和 push_front 效率为O(1)
+
+### list
+双向循环链表
+
+* insert O(1)
+* 访问[] O(n)
+
+### vector deque list 对比
+- vector vs deque
+    - 扩容
+        - vector 是基于连续的数组，经常扩容，每次扩容都会进行对象的析构和构造
+        - deque 基于不连续的数组，扩容时，不会进行对象的深拷贝
+        - list 是离散的，不涉及扩容
+    
+    - 中间删除
+        - deque 删除中间元素，需要进行元素移动，如果有多个二维数组，则需要跨数组移动，效率低
+        - vector删除中间元素，需要进行元素移动，但是由于内存一定连续，所以效率相对高
+
+
+- list vs vector
+    - 增删
+        - list O(1)
+        - vector O(n)
+    - 访问
+        - list O(n)
+        - vector O(1)
+
