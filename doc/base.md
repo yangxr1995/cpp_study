@@ -2127,3 +2127,181 @@ pop_back(); //  末尾删除元素
 
 multi指元素可以重复
 
+### 无序关联容器
+底层使用hash表
+
+#### unordered_set
+```cpp
+#include <iostream>
+#include <unordered_set>
+using namespace std;
+
+int main()
+{
+        unordered_set<int> s;
+
+        for (int i = 0; i < 20; i++)
+                s.insert(i);
+
+        for (auto it = s.begin(); it != s.end(); ++it)
+                cout << *it << " ";
+        cout << endl;
+
+        auto it = s.find(3);
+        if (it != s.end())
+                s.erase(it);
+        s.erase(10);
+
+        for (auto it = s.begin(); it != s.end(); ++it)
+                cout << *it << " ";
+        cout << endl;
+
+        return 0;
+}
+```
+#### unordered_map
+```cpp
+int main()
+{
+        unordered_map<int, const char *> stu_map;
+
+        /*
+         * insert参数
+         *    struct pair {
+         *       T1 first;
+         *       T2 second;
+         *    };
+         */
+        stu_map.insert(make_pair(1000, "Jim"));
+        stu_map.insert(make_pair(1010, "Tom"));
+        stu_map.insert(make_pair(1020, "Jun"));
+
+        cout << "size : " << stu_map.size() << endl;
+        /*
+         * operator[] :
+         *   如果key存在，则返回
+         *   如果key不存在，则插入value为默认构造元素，并返回
+         */
+        cout << "1000 : " << stu_map[1000] << endl;
+
+        // map可以修改value
+        stu_map[1010] = "Tom2";
+
+        // find 返回的是 struct pair
+        auto it = stu_map.find(1010);
+        cout << "key : " << it->first << ", " << "Second : " << it->second << endl;
+
+        stu_map.erase(1000);
+
+        return 0;
+}
+```
+
+### 有序关联容器
+底层使用红黑树
+#### set
+```cpp
+class Stu {
+        public:
+                Stu(int id = 0, string name = "")
+                        :_id(id), _name(name) {}
+                friend ostream &operator<<(ostream &out, const Stu &s);
+                // 对于顺序关联容器，需定义 < 的常方法
+                bool operator<(const Stu &s) const {
+                        return this->_id < s._id;
+                }
+        private:
+                string _name;
+                int _id;
+};
+
+ostream &operator<<(ostream &out, const Stu &s)
+{
+        out << s._id << " " << s._name;
+        return out;
+}
+
+int main()
+{
+        set<Stu> stu_set;
+
+        stu_set.insert(Stu(70, "aa"));
+        stu_set.insert(Stu(20, "bb"));
+        stu_set.insert(Stu(10, "cc"));
+        stu_set.insert(Stu(30, "dd"));
+        stu_set.insert(Stu(20, "xx")); // 不支持重复，重复添加的元素会被忽略
+
+        for (Stu pos : stu_set)
+                cout << pos << endl;
+
+        return 0;
+}
+```
+#### map
+```cpp
+class Stu {
+        public:
+                Stu(int id = 0, const char *name = "")
+                        :_id(id), _name(name) {}
+                friend ostream &operator<<(ostream &out, const Stu &stu);
+        private:
+                int _id;
+                string _name;
+};
+
+ostream &operator<<(ostream &out, const Stu &stu)
+{
+        out << stu._id << ", " << stu._name << endl;
+        return out;
+}
+
+int main()
+{
+        map<int, Stu>stu_map;
+        Stu *pstu;
+
+        pstu = new Stu(12, "aa");
+        // map 不需要定义 operator< 因为他使用 key 的operator<
+        // 这里key为 int ，int 的< 是存在的
+        // 由map根据key值，计算位置，插入元素
+        stu_map.insert(make_pair(12, Stu(12, "aa")));
+        stu_map.insert(make_pair(13, Stu(13, "bb")));
+        stu_map.insert(make_pair(10, Stu(10, "cc")));
+
+        // 由程序员指定插入位置
+        stu_map[1] = Stu(111, "xxx");
+
+        // 中序遍历红黑树
+        for (const pair<int, Stu>pos : stu_map)
+                cout << pos.second;
+        cout << endl;
+
+        return 0;
+}
+```
+## 迭代器
+```cpp
+// 正向迭代器
+  for (map<int, Stu>::iterator it = stu_map.begin(); it != stu_map.end(); ++it)
+      cout << it->second;
+  cout << endl;
+
+// const正向迭代器
+  /*
+   * class iterator : public const_iterator
+   * 所以 iterator --> const_iterator
+   */
+  for (map<int, Stu>::const_iterator it = stu_map.begin(); it != stu_map.end(); ++it)
+      cout << it->second;
+  cout << endl;
+
+// 反向迭代器
+  for (map<int, Stu>::reverse_iterator it = stu_map.rbegin(); it != stu_map.rend(); ++it)
+      cout << it->second;
+  cout << endl;
+
+// const反向迭代器
+  for (map<int, Stu>::const_reverse_iterator it = stu_map.rbegin(); it != stu_map.rend(); ++it)
+      cout << it->second;
+  cout << endl;
+```
