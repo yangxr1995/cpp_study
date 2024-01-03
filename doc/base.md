@@ -864,8 +864,6 @@ int main()
 	// 需要实现模板特例化
 //	cmp("aaa", "bbb");
 
-
-
 	return 0;
 }
 ```
@@ -987,8 +985,6 @@ T stack<T>::top() const
 	return data[len - 1];
 }
 
-
-
 void func()
 {
 	stack<int> s;
@@ -1013,6 +1009,7 @@ void func()
 
 # 匿名对象
 
+## 返回匿名对象
 函数返回对象本身，则会调用拷贝构造，构造一个匿名对象。
 
 匿名对象本质是在母函数栈上分配一个对象，并将对象的地址传给子函数，
@@ -1071,6 +1068,7 @@ test aa = back(1, 2);
 
 所以aa可以直接使用
 
+## 匿名对象做参数
 
 # oop
 ## 继承
@@ -2118,6 +2116,7 @@ pop_back(); //  末尾删除元素
         - list O(n)
         - vector O(1)
 
+
 ## 关联容器
 * 一般关联容器
 * unordered_xx
@@ -2305,3 +2304,161 @@ int main()
       cout << it->second;
   cout << endl;
 ```
+
+## 函数对象
+### 只有函数的类
+
+```cpp
+#include <iostream>
+using namespace std;
+
+template<typename T>
+class Sum {
+        public:
+                T operator()(T a, T b)
+                {
+                        return a + b;
+                }
+};
+
+int main()
+{
+        Sum<int> *psum = new Sum<int>;
+        (*psum)(1, 2);
+
+        return 0;
+}
+```
+函数只有重载小括号操作，其对象表现为函数的表达式
+
+```asm
+      Sum<int> *psum = new Sum<int>;
+     105e0:   mov r0, #1
+     105e4:   bl  10490 <operator new(unsigned int)@plt>
+     105e8:   mov r3, r0
+     105ec:   str r3, [fp, #-8]
+      (*psum)(1, 2);
+     105f0:   mov r2, #2
+     105f4:   mov r1, #1
+     105f8:   ldr r0, [fp, #-8]
+     105fc:   bl  10690 <Sum<int>::operator()(int, int)>
+
+```
+对于此类对象，也就需要占用一个字节，并且调用类方法时依旧需要传递r0参数
+
+### 函数指针和模板
+```cpp
+#include <iostream>
+using namespace std;
+
+template<typename T>
+bool myless(const T &a, const T &b)
+{
+        return a < b;
+}
+
+template<typename T>
+bool mygreater(const T &a, const T &b)
+{
+        return a > b;
+}
+
+template<typename T, typename Compile>
+bool compare(const T &a, const T &b, Compile comp)
+{
+        return comp(a, b);
+}
+
+int main()
+{
+        cout << compare(1, 2, myless<int>) << endl;
+        cout << compare(1, 2, mygreater<int>) << endl;
+
+        return 0;
+}
+```
+通过函数指针做参数，可以让函数更加灵活
+
+缺点是，函数指针调用函数，无法内联。因为内联是在编译阶段，但是函数指针调用是运行阶段。
+
+```asm
+  00010940 <bool myless<int>(int const&, int const&)>:
+  bool myless(const T &a, const T &b)
+     10940:   push    {fp}        ; (str fp, [sp, #-4]!)
+     10944:   add fp, sp, #0
+     10948:   sub sp, sp, #12
+     1094c:   str r0, [fp, #-8]
+     10950:   str r1, [fp, #-12]
+      return a < b;
+     10954:   ldr r3, [fp, #-8]
+     10958:   ldr r2, [r3]
+     1095c:   ldr r3, [fp, #-12]
+     10960:   ldr r3, [r3]
+     10964:   cmp r2, r3
+     10968:   movlt   r3, #1
+     1096c:   movge   r3, #0
+     10970:   and r3, r3, #255    ; 0xff
+  }
+
+  00010984 <bool compare<int, bool (*)(int const&, int const&)>(int const&, int const&, bool (*)(int const&, int const&))>:
+  bool compare(const T &a, const T &b, Compile comp)
+     10984:   push    {fp, lr}
+     10988:   add fp, sp, #4
+     1098c:   sub sp, sp, #16
+     10990:   str r0, [fp, #-8]
+     10994:   str r1, [fp, #-12]
+     10998:   str r2, [fp, #-16]
+      return comp(a, b);
+     1099c:   ldr r3, [fp, #-16]
+     109a0:   ldr r1, [fp, #-12]
+     109a4:   ldr r0, [fp, #-8]
+     109a8:   blx r3
+     109ac:   mov r3, r0
+  }
+```
+
+无法避免压栈和栈帧开辟等操作
+
+### 使用函数对象做参数实现函数的灵活性
+```cpp
+template<typename T>
+class myless {
+    public:
+        inline bool operator()(const T a, const T b) {
+                return a < b;
+        }
+        // 可以添加赋值参数
+        static int cnt;
+};
+
+template<typename T>
+int myless<T>::cnt = 0;
+
+template<typename T>
+class mygreater {
+    public:
+        inline bool operator()(const T a, const T b) {
+                return a > b;
+        }
+};
+
+template<typename T, typename Compile>
+bool compare(const T a, const T b, Compile comp)
+{
+    // 编译阶段确定了 comp的类型，
+    // 就可以确定 operator() 函数的定义
+    // 所以可以使用内联函数
+    return comp(a, b);
+}
+
+int main(int argc, char **argv)
+{
+    // 编译阶段自动推导生成 compare(int, int, myless<int>)
+    compare(1, 2, myless<int>());
+    // 编译阶段自动推导生成 compare(int, int, greater<int>)
+    compare(1, 2, mygreater<int>());
+
+    return 0;
+}
+```
+
