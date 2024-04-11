@@ -37,7 +37,7 @@ public:
 		_end = _first + len;
 	}
 
-	vector(const T &x) {
+	vector(const vector<T> &x) {
 		T *p, *p2;
 		unsigned int cap, n;
 
@@ -246,6 +246,12 @@ int main()
 	cout << endl;
 
 	for (int i: v_int)
+		cout << i << " ";
+	cout << endl;
+
+	vector<int>v = v_int;
+
+	for (int i: v)
 		cout << i << " ";
 	cout << endl;
 
