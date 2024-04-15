@@ -134,7 +134,7 @@ public:
 			return _p != it._p;
 		}
 
-		iterator operator++() 
+		iterator &operator++() 
 		{
 			_p++;
 			return *this;
