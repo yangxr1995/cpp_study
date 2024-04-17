@@ -1,4 +1,9 @@
+#include <bits/c++config.h>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
+#include <ostream>
 using namespace std;
 
 /*
@@ -24,111 +29,187 @@ using namespace std;
  *    再释放整个内存
  */
 
+
 /*
  * 3. 重载new
+ *    常用于实现对象持，示例中QueueItem会被频繁分配
+ *    释放，所以可以预先分配，之后从池中获取。
+ *    需要注意的是 new 的参数决定了链接的函数，也就
+ *    决定了在哪个类中定义重载的new
+ *
+ * 需要注意 new delete 时编译器加的代码
+ *
+ * void *operator new(size_t sz);
+ * 如此重载后，调用new处的代码调用流程为
+ * operator new(size_t sz) // 首先分配空间
+ * 构造基类，基类构造顺序为在子类中的声明顺序
+ * 构造组合类，构造顺序为声明顺序
+ * 构造自己
+ *
+ * void operator delete(void *addr);
+ * 当重载delete后，调用delete处的代码调用流程为
+ * 析构自己
+ * 析构组合类
+ * 析构基类
+ * 调用 operator delete(void *), 可用于释放空间
+ *
+ * void *operator new(size_t sz, void *addr)
+ * placement new 重载后，调用new处的代码调用流程为
+ * 构造基类，基类构造顺序为在子类中的声明顺序
+ * 构造组合类，构造顺序为声明顺序
+ * operator new(size_t sz, void *addr)
+ * 构造自己
  */
 
+template<typename T>
 class Queue {
 	public:
 		Queue() {
-			_head = nullptr;
-			_tail = nullptr;
+			_first = nullptr;
+			_last = nullptr;
 		}
+		void push(const T &a) {
+			QueueItem *n;			
 
-		~Queue() {
-			QueueItem *item, *tmp;
-
-			for (item = _head,tmp = _head == nullptr ? nullptr : _head->next; 
-					item != _tail; item = tmp, tmp = item->next) {
-				delete item;	
-			}
+			n->_next = _first;
+			if (_first)
+				_first->_prev = n;
+			_first = n;
+			if (_last == nullptr)
+				_last = n;
 		}
+		T pop() {
+			T ret;
+			QueueItem *tmp;
+			if (_last == nullptr)
+				throw "Queue empty";
+			ret = _last->_data;
+			tmp = _last;
+			_last = _last->_prev;
+			if (_last == nullptr)
+				_first = nullptr;
 
-		Queue &push(const int data) {
-			QueueItem *item;
+			delete tmp;
 
-			item = new QueueItem;
-			item->prev = nullptr;
-			item->next = _head;
-			if (_head)
-				_head->prev = item;
-			_head = item;
-
-			if (_tail == nullptr)
-				_tail = item;
-
-			return *this;
+			return ret;
 		}
-
-		int pop() {
-			QueueItem *item;
-			int data;
-
-			if (_tail == nullptr)
-				throw "QueueIsEmpty";
-
-			item = _tail;	
-			_tail = _tail->prev;
-			if (_tail)
-				_tail->next = nullptr;
-			data = item->data;
-			delete item;
-
-			return data;
-		}
-
 
 		struct QueueItem {
-			QueueItem *next;
-			QueueItem *prev;
-			int data;
+			QueueItem() {}
+			QueueItem(const T &data)
+			:_data(data), _next(nullptr), _prev(nullptr) {
+				cout << "QueueItem construct" << endl;
+			}
+			~QueueItem() {
+				cout << "~QueueItem destruct" << endl;
+			}
 
-			void *operator new(size_t size) {
-				if (QueueItemList == nullptr) {
-					int i;
-					QueueItemList = new QueueItem[QueueItemBatch];
-					for (i = 0; i < QueueItemBatch - 1; i++)
-						QueueItemList[i].next = &QueueItemList[i + 1];
-					QueueItemList[i].next = nullptr;
+			// placement new
+			// 在分配了内存之后，调用自己的构造之前调用placement new
+			void *operator new(size_t sz, QueueItem *addr) {
+				cout << "QueueItem placement new" << endl;	
+				return addr;
+			}
+
+			// 普通new
+			// 用于分配内存，在所有构造之前被调用
+			void *operator new(size_t sz) {
+				cout << "QueueItem operator new" << endl;
+				void *n;
+
+				if (_qlist_cache != nullptr) {
+					n = _qlist_cache;	
+					_qlist_cache = _qlist_cache->_next;
 				}
-				QueueItem *ret = QueueItemList;		
-				QueueItemList = QueueItemList->next;
-				return ret;
+				else {
+					cout << "malloc" << endl;
+					n = malloc(sz);
+				}
+
+				return n;
 			}
 
-			static void operator delete(void *p) {
-				QueueItem *item = (QueueItem *)p;
-				
-				item->next = QueueItemList;
-				QueueItemList = item;
+			void operator delete(void *addr) {
+				cout << "QueueItem operator delete " << endl;
+				QueueItem *n = (QueueItem *)addr;
+					
+				n->_next = _qlist_cache;
+				_qlist_cache = n;
 			}
 
-			// 1. 注意static基础类型可以在class{} 中初始化
-			//    类类型不可以，因为类类型会调用构造函数，
-			//    编译阶段无法执行构造
-			static const int QueueItemBatch = 100;
-			static QueueItem *QueueItemList;
+			T _data;
+			QueueItem *_next;
+			QueueItem *_prev;
+			static QueueItem *_qlist_cache;
 		};
 
 	private:
-
-		QueueItem *_head;
-		QueueItem *_tail;
+		QueueItem *_first;
+		QueueItem *_last;
 };
 
+// 1. 使用typename声明T为类型，之后才可以用
+template<typename T>
+typename Queue<T>::QueueItem g_a;
 
-Queue::QueueItem *Queue::QueueItem::QueueItemList = nullptr;
+// 1. typename只能管下面一个表达式，所以新的表达式需要重新声明T
+// 2. Queue<T>::QueueItem 可能为熟悉，也可以为类型，需要用typename强制指定为类型
+template<typename T>
+typename Queue<T>::QueueItem *Queue<T>::QueueItem::_qlist_cache = nullptr;
 
+class Student {
+	public:
+		Student(unsigned int age = 0)
+		:_age(age){
+			cout << "Student construct" << _age << endl;
+		}
+		Student(const Student &stu) 
+		:_age(stu._age){
+			cout << "Student copy construct" << _age << endl;	
+		}
+		~Student() {
+			cout << "Student destruct" << endl;
+		}
+		friend ostream &operator<<(ostream &out, const Student &s);
+	private:
+		int _age;
+};
+
+ostream &operator<<(ostream &out, const Student &s)
+{
+	out << "Student age "  << s._age << " ";
+	return out;
+}
+
+int test() 
+{
+	Queue<Student> q;	
+
+	for (int i = 0; i < 10; i++) {
+		cout << "push begin" << endl;
+		q.push(Student(i));
+		cout << "push end" << endl;
+	}
+
+	for (int i = 0; i < 10; i++) {
+		cout << "pop begin" << endl;
+		cout << q.pop() << " ";
+		cout << "pop end" << endl;
+	}
+
+	for (int i = 0; i < 10; i++) {
+		cout << "push begin" << endl;
+		q.push(i);
+		cout << "push end" << endl;
+	}
+
+	return 0;
+}
 
 int main()
 {
-	Queue q;	
-
-	for (int i = 0; i < 10; i++) {
-		q.push(i);
-		cout << q.pop() << " ";
-	}
-	cout << endl;
-
+	cout << "test begin" << endl;
+	test();
+	cout << "test end" << endl;
 	return 0;
 }
