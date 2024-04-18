@@ -655,6 +655,10 @@ catch (const bad_alloc & e) {
 	
 }
 ```
+
+## operator new
+
+
 # 类
 ## 指向类成员的指针
 ```c
