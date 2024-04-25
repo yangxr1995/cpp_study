@@ -48,8 +48,9 @@ class Fun3 {
 		int &b;
 };
 
-int main()
+void lambda_demo()
 {
+	cout << "----------------- lambda 示例 ---------------" << endl;
 	/*
 	 * lambda 用于定义函数对象
 	 *
@@ -88,5 +89,11 @@ int main()
 	cout << "func3(3) " << func3(3) << endl;
 	cout << "a " << a << endl;
 
+
+}
+
+int main()
+{
+	lambda_demo();
 	return 0;
 }

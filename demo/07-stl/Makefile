@@ -1,15 +1,15 @@
 
 all:
-	g++ ./vector.cpp -g -O0 -o vector
+	g++ ./02-vector.cpp -g -O0 -o vector
 	echo "--------- vector -----------"
 	./vector
-	g++ ./deque.cpp -g -O0 -o deque
+	g++ ./01-deque.cpp -g -O0 -o deque
 	echo "--------- deque -----------"
 	./deque
-	g++ ./set.cpp -g -O0 -o set
+	g++ ./03-set.cpp -g -O0 -o set
 	echo "--------- set -----------"
 	./set
-	g++ ./map.cpp -g -O0 -o map 
+	g++ ./04-map.cpp -g -O0 -o map 
 	echo "--------- map -----------"
 	./map
 
