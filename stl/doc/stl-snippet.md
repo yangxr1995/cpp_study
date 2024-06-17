@@ -203,9 +203,13 @@ int main()
 
 ## ostreambuf_iterator
 
-std::ostreambuf_iterator is a single-pass LegacyOutputIterator that writes successive characters into the std::basic_streambuf object for which it was constructed. The actual write operation is performed when the iterator (whether dereferenced or not) is assigned to. Incrementing the std::ostreambuf_iterator is a no-op.
+std::ostreambuf_iterator is a single-pass LegacyOutputIterator that writes successive characters into the std::basic_streambuf object for which it was constructed. 
 
-In a typical implementation, the only data members of std::ostreambuf_iterator are a pointer to the associated std::basic_streambuf and a boolean flag indicating if the end of file condition has been reached.
+The actual write operation is performed when the iterator (whether dereferenced or not) is assigned to. Incrementing the std::ostreambuf_iterator is a no-op.
+
+In a typical implementation, the only data members of std::ostreambuf_iterator are a pointer to the associated std::basic_streambuf and a boolean flag indicating 
+
+if the end of file condition has been reached.
 
 ### 示例
 ```cpp
@@ -221,7 +225,8 @@ int main()
 }
 ```
 
-# back_inserter
+# back_inserter front_inserter inserter
+## back_inserter
 ```cpp
 template< class Container >
 std::back_insert_iterator<Container> back_inserter( Container& c );
@@ -249,7 +254,7 @@ int main()
 }
 ```
 
-# back_insert_iterator
+### back_insert_iterator
 
 ```cpp
 template< class Container >
@@ -289,6 +294,96 @@ int main()
         10,
         [n = 0]() mutable { return ++n; }
     );
+ 
+    for (int n : v)
+        std::cout << n << ' ';
+    std::cout << '\n';
+}
+```
+
+## front_inserter
+```cc
+template< class Container >
+std::front_insert_iterator<Container> front_inserter( Container& c );
+```
+
+front_inserter is a convenience function template that constructs a std::front_insert_iterator for the container c 
+
+with the type deduced from the type of the argument.
+
+front_inserter 根据 模板参数类型 推导 容器c ，构造 容器c的 front_insert_iterator
+
+A std::front_insert_iterator which can be used to add elements to the beginning of the container c.
+
+front_inserter 用于在容器c的开头添加元素
+
+```cc
+#include <algorithm>
+#include <deque>
+#include <iostream>
+#include <iterator>
+#include <vector>
+ 
+int main()
+{
+    std::vector<int> v{1, 2, 3, 4, 5};
+    std::deque<int> d;
+    std::copy(v.begin(), v.end(), std::front_inserter(d));
+    for (int n : d)
+        std::cout << n << ' ';
+    std::cout << '\n';
+}
+```
+
+## inserter
+```cc
+template< class Container >
+std::insert_iterator<Container>
+    inserter( Container& c, typename Container::iterator i );
+template< class Container >
+constexpr std::insert_iterator<Container>
+    inserter( Container& c, ranges::iterator_t<Container> i );
+```
+inserter is a convenience function template that constructs a std::insert_iterator for the container c 
+
+and its iterator i with the type deduced from the type of the argument.
+
+inserter 用于构造 insert_iterator 
+
+### Parameters
+c	-	container that supports an insert operation
+
+c - 支持insert操作的容器
+
+i	-	iterator in c indicating the insertion position
+
+i - c的iterator，用于指示插入位置
+
+### 示例
+```cc
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <set>
+#include <vector>
+ 
+int main()
+{
+    std::multiset<int> s{1, 2, 3};
+ 
+    // std::inserter is commonly used with multi-sets
+    std::fill_n(std::inserter(s, s.end()), 5, 2);
+ 
+    for (int n : s)
+        std::cout << n << ' ';
+    std::cout << '\n';
+ 
+    std::vector<int> d{100, 200, 300};
+    std::vector<int> v{1, 2, 3, 4, 5};
+ 
+    // when inserting in a sequence container, insertion point advances
+    // because each std::insert_iterator::operator= updates the target iterator
+    std::copy(d.begin(), d.end(), std::inserter(v, std::next(v.begin())));
  
     for (int n : v)
         std::cout << n << ' ';
@@ -352,5 +447,935 @@ int main()
 }
 ```
 
+# search
+```cpp
+(1)
+template< class ForwardIt1, class ForwardIt2 >
+ForwardIt1 search( ForwardIt1 first, ForwardIt1 last,
+                   ForwardIt2 s_first, ForwardIt2 s_last );
 
+(2)
+template< class ExecutionPolicy, class ForwardIt1, class ForwardIt2 >
+ForwardIt1 search( ExecutionPolicy&& policy,
+                   ForwardIt1 first, ForwardIt1 last,
+                   ForwardIt2 s_first, ForwardIt2 s_last );
+
+(3)
+template< class ForwardIt1, class ForwardIt2, class BinaryPred >
+ForwardIt1 search( ForwardIt1 first, ForwardIt1 last,
+                   ForwardIt2 s_first, ForwardIt2 s_last,
+                   BinaryPred p );
+(4)
+template< class ExecutionPolicy,
+          class ForwardIt1, class ForwardIt2, class BinaryPred >
+ForwardIt1 search( ExecutionPolicy&& policy,
+                   ForwardIt1 first, ForwardIt1 last,
+                   ForwardIt2 s_first, ForwardIt2 s_last,
+                   BinaryPred p );
+
+```
+1-4) Searches for the first occurrence of the sequence of elements [s_first, s_last) in the range [first, last).
+
+1-4) 搜索[s_first, s_last) 的元素序列在 [first, last) 范围内的第一次的出现
+
+- 1) Elements are compared using operator==.
+
+重载1的元素比较使用 operator==
+
+3) Elements are compared using the given binary predicate p.
+
+重载3的元素比较使用用户指定的二进制谓词p
+
+2,4) Same as (1,3), but executed according to policy.
+
+重载2，4 和 1，3 一样，但是 根据 policy
+
+## Type requirements
+- ForwardIt1, ForwardIt2 must meet the requirements of LegacyForwardIterator.
+
+- BinaryPred must meet the requirements of BinaryPredicate.
+
+### BinaryPredicate
+两个参数，返回bool
+```cpp
+bool p(iter *, iter *)
+```
+
+## 返回值
+
+1-4) Iterator to the beginning of first occurrence of the sequence [s_first, s_last) in the range [first, last). If no such occurrence is found, last is returned.
+
+1-4) 返回迭代器，如果找到，迭代器指向 [first, last) 中的第一个元素，此元素是首次匹配的位置，如果没有，则返回 last
+
+ If [s_first, s_last) is empty, first is returned.
+
+如果 [s_first, s_last) 为空，返回 first
+
+## 示例
+```cpp
+#include <algorithm>
+#include <cassert>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <string_view>
+#include <vector>
+ 
+using namespace std::literals;
+ 
+bool contains(const auto& cont, std::string_view s)
+{
+    // str.find() (or str.contains(), since C++23) can be used as well
+    return std::search(cont.begin(), cont.end(), s.begin(), s.end()) != cont.end();
+}
+ 
+int main()
+{
+    const auto str{"why waste time learning, when ignorance is instantaneous?"sv};
+    assert(contains(str, "learning"));
+    assert(not contains(str, "lemming"));
+ 
+    const std::vector vec(str.begin(), str.end());
+    assert(contains(vec, "learning"));
+    assert(not contains(vec, "leaning"));
+ 
+    // The C++17 overload with searchers demo:
+    constexpr auto quote
+    {
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed "
+        "do eiusmod tempor incididunt ut labore et dolore magna aliqua"sv
+    };
+ 
+    for (const auto word : {"pisci"sv, "Pisci"sv})
+    {
+        std::cout << "The string " << std::quoted(word) << ' ';
+        const std::boyer_moore_searcher searcher(word.begin(), word.end());
+        const auto it = std::search(quote.begin(), quote.end(), searcher);
+        if (it == quote.end())
+            std::cout << "not found\n";
+        else
+            std::cout << "found at offset " << std::distance(quote.begin(), it) << '\n';
+    }
+}
+```
+# getline
+```
+template< class CharT, class Traits, class Allocator >
+std::basic_istream<CharT, Traits>&
+    getline( std::basic_istream<CharT, Traits>& input,
+             std::basic_string<CharT, Traits, Allocator>& str, CharT delim );
+(1)	
+template< class CharT, class Traits, class Allocator >
+std::basic_istream<CharT, Traits>&
+    getline( std::basic_istream<CharT, Traits>&& input,
+             std::basic_string<CharT, Traits, Allocator>& str, CharT delim );
+(2)	(since C++11)
+template< class CharT, class Traits, class Allocator >
+std::basic_istream<CharT, Traits>&
+    getline( std::basic_istream<CharT, Traits>& input,
+             std::basic_string<CharT, Traits, Allocator>& str );
+(3)	
+template< class CharT, class Traits, class Allocator >
+std::basic_istream<CharT, Traits>&
+    getline( std::basic_istream<CharT, Traits>&& input,
+             std::basic_string<CharT, Traits, Allocator>& str );
+```
+
+
+getline reads characters from an input stream and places them into a string:
+
+getline 从input stream 读取字符，并将其存入 string
+
+1,2) Behaves as UnformattedInputFunction, except that input.gcount() is not affected. After constructing and checking the sentry object, performs the following:
+
+1,2) 作为 UnformattedInputFunction, 不影响 input.gcount()。 
+
+1) Calls str.erase().
+
+
+2) Extracts characters from input and appends them to str until one of the following occurs (checked in the order listed)
+
+从流提取字符，并追加到str，直到以下情况发送
+
+a) end-of-file condition on input, in which case, getline sets eofbit.
+
+到达流末尾，getline 设置 eofbit
+
+b) the next available input character is delim, as tested by Traits::eq(c, delim), in which case the delimiter character is extracted from input, 
+
+but is not appended to str.
+
+下一个有效的输入字符是分隔符，内部使用 Traits::eq(c, delim) 检查，这种情况分隔符字符被从流中提取，但是不追加到 str
+
+c) str.max_size() characters have been stored, in which case getline sets failbit and returns.
+
+str 满了，这种情况设置failbit
+
+3) If no characters were extracted for whatever reason (not even the discarded delimiter), getline sets failbit and returns.
+
+3,4) Same as getline(input, str, input.widen('\n')), that is, the default delimiter is the endline character.
+
+## NOTE
+
+When consuming whitespace-delimited input (e.g. int n; std::cin >> n;) 
+
+当消耗空白分隔符输入，如 int n; std::cin>> n; 
+
+any whitespace that follows, including a newline character, will be left on the input stream. 
+
+任何随后的空白符，包括换行符，会被留在流中。
+
+Then when switching to line-oriented input, the first line retrieved with getline will be just that whitespace. 
+
+当再次进行流输入时，首次接受会是空格符，
+
+In the likely case that this is unwanted behaviour, possible solutions include:
+
+这种情况通常时不希望的，有以下可能解决方法
+
+An explicit extraneous initial call to getline.
+
+1. 显示进行额外的getline
+
+Removing consecutive whitespace with std::cin >> std::ws.
+
+2. 使用 std::cin>>std::ws 来移除连续的空白符
+
+Ignoring all leftover characters on the line of input with cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');.
+
+3. 忽略行输入行上的所有字符，使用 cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');.
+
+```cpp
+#include <iostream>
+#include <sstream>
+#include <string>
+ 
+int main()
+{
+    // greet the user
+    std::string name;
+    std::cout << "What is your name? ";
+    std::getline(std::cin, name);
+    std::cout << "Hello " << name << ", nice to meet you.\n";
+ 
+    // read file line by line
+    std::istringstream input;
+    input.str("1\n2\n3\n4\n5\n6\n7\n");
+    int sum = 0;
+    for (std::string line; std::getline(input, line);)
+        sum += std::stoi(line);
+    std::cout << "\nThe sum is " << sum << ".\n\n";
+ 
+    // use separator to read parts of the line
+    std::istringstream input2;
+    input2.str("a;b;c;d");
+    for (std::string line; std::getline(input2, line, ';');)
+        std::cout << line << '\n';
+}
+```
+
+# accumulate
+```cc
+template< class InputIt, class T >
+T accumulate( InputIt first, InputIt last, T init );
+template< class InputIt, class T, class BinaryOp >
+T accumulate( InputIt first, InputIt last, T init, BinaryOp op );
+```
+
+Computes the sum of the given value init and the elements in the range [first, last).
+
+求和：init值 累加 [first, last) 的元素
+
+1) Initializes the accumulator acc (of type T) with the initial value init and then modifies it 
+
+with `acc = acc + *i(until C++20)acc = std::move(acc) + *i(since C++20)` for every iterator i in the range [first, last) in order.
+
+2) Initializes the accumulator acc (of type T) with the initial value init and then modifies it 
+
+with `acc = op(acc, *i)(until C++20)acc = op(std::move(acc), *i)(since C++20) ` for every iterator i in the range [first, last) in order.
+
+If any of the following conditions is satisfied, the behavior is undefined:
+
+T is not CopyConstructible.
+T is not CopyAssignable.
+op modifies any element of [first, last).
+op invalidates any iterator or subrange in [first, last].
+
+```cc
+#include <functional>
+#include <iostream>
+#include <numeric>
+#include <string>
+#include <vector>
+ 
+int main()
+{
+    std::vector<int> v{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+ 
+    int sum = std::accumulate(v.begin(), v.end(), 0);
+    int product = std::accumulate(v.begin(), v.end(), 1, std::multiplies<int>());
+ 
+    auto dash_fold = [](std::string a, int b)
+    {
+        return std::move(a) + '-' + std::to_string(b);
+    };
+ 
+    std::string s = std::accumulate(std::next(v.begin()), v.end(),
+                                    std::to_string(v[0]), // start with first element
+                                    dash_fold);
+ 
+    // Right fold using reverse iterators
+    std::string rs = std::accumulate(std::next(v.rbegin()), v.rend(),
+                                     std::to_string(v.back()), // start with last element
+                                     dash_fold);
+ 
+    std::cout << "sum: " << sum << '\n'
+              << "product: " << product << '\n'
+              << "dash-separated string: " << s << '\n'
+              << "dash-separated string (right-folded): " << rs << '\n';
+}
+```
+
+# copy remove_copy remove_copy_if
+## remove_copy remove_copy_if
+```cc
+template< class InputIt, class OutputIt, class T >
+OutputIt remove_copy( InputIt first, InputIt last,
+                      OutputIt d_first, const T& value );
+
+(1)
+template< class InputIt, class OutputIt,
+          class T = typename std::iterator_traits
+                        <InputIt>::value_type >
+constexpr OutputIt remove_copy( InputIt first, InputIt last,
+                                OutputIt d_first, const T& value );
+
+template< class ExecutionPolicy,
+          class ForwardIt1, class ForwardIt2, class T >
+ForwardIt2 remove_copy( ExecutionPolicy&& policy,
+                        ForwardIt1 first, ForwardIt1 last,
+                        ForwardIt2 d_first, const T& value );
+
+(2)
+template< class ExecutionPolicy,
+          class ForwardIt1, class ForwardIt2,
+          class T = typename std::iterator_traits
+                        <ForwardIt1>::value_type >
+ForwardIt2 remove_copy( ExecutionPolicy&& policy,
+                        ForwardIt1 first, ForwardIt1 last,
+                        ForwardIt2 d_first, const T& value );
+
+(3)
+template< class InputIt, class OutputIt, class UnaryPred >
+OutputIt remove_copy_if( InputIt first, InputIt last,
+                         OutputIt d_first, UnaryPred p );
+
+(4)
+template< class ExecutionPolicy,
+          class ForwardIt1, class ForwardIt2, class UnaryPred >
+ForwardIt2 remove_copy_if( ExecutionPolicy&& policy,
+                           ForwardIt1 first, ForwardIt1 last,
+                           ForwardIt2 d_first, UnaryPred p );
+```
+
+从 [first, last) 拷贝元素到 从 d_first开始的范围，省略满足特定条件的元素。
+
+1） 忽略所有等于value的元素 ,使用operator==
+
+2)  忽略所有谓词 p 为真的元素
+
+## Return value
+Iterator to the element past the last element copied.
+
+## 可能的实现
+### remove_copy
+```cc
+template<class InputIt, class OutputIt,
+         class T = typename std::iterator_traits<InputIt>::value_type>
+constexpr OutputIt remove_copy(InputIt first, InputIt last,
+                               OutputIt d_first, const T& value)
+{
+    for (; first != last; ++first)
+        if (!(*first == value))
+            *d_first++ = *first;
+    return d_first;
+}
+```
+
+### remove_copy_if
+```cc
+template<class InputIt, class OutputIt, class UnaryPred>
+constexpr OutputIt remove_copy_if(InputIt first, InputIt last,
+                                  OutputIt d_first, UnaryPred p)
+{
+    for (; first != last; ++first)
+        if (!p(*first))
+            *d_first++ = *first;
+    return d_first;
+}
+```
+
+## 示例
+```cc
+#include <algorithm>
+#include <complex>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <string>
+#include <vector>
+ 
+int main()
+{
+    // Erase the hash characters '#' on the fly.
+    std::string str = "#Return #Value #Optimization";
+    std::cout << "before: " << std::quoted(str) << '\n';
+ 
+    std::cout << "after:  \"";
+    std::remove_copy(str.begin(), str.end(),
+                     std::ostream_iterator<char>(std::cout), '#');
+    std::cout << "\"\n";
+ 
+    // Erase {1, 3} value on the fly.
+    std::vector<std::complex<double>> nums{{2, 2}, {1, 3}, {4, 8}, {1, 3}};
+    std::remove_copy(nums.begin(), nums.end(),
+                     std::ostream_iterator<std::complex<double>>(std::cout),
+    #ifdef __cpp_lib_algorithm_default_value_type
+                     {1, 3}); // T gets deduced
+    #else
+                     std::complex<double>{1, 3});
+    #endif
+}
+```
+
+# remove remove_if
+```cc
+template< class ForwardIt, class T >
+ForwardIt remove( ForwardIt first, ForwardIt last, const T& value );
+
+(1)
+template< class ForwardIt, class T = typename std::iterator_traits
+                                         <ForwardIt>::value_type >
+constexpr ForwardIt remove( ForwardIt first, ForwardIt last,
+                            const T& value );
+
+template< class ExecutionPolicy, class ForwardIt, class T >
+ForwardIt remove( ExecutionPolicy&& policy,
+                  ForwardIt first, ForwardIt last, const T& value );
+
+(2)
+template< class ExecutionPolicy, class ForwardIt,
+          class T = typename std::iterator_traits
+                        <ForwardIt>::value_type >
+ForwardIt remove( ExecutionPolicy&& policy,
+                  ForwardIt first, ForwardIt last, const T& value );
+
+(3)
+template< class ForwardIt, class UnaryPred >
+ForwardIt remove_if( ForwardIt first, ForwardIt last, UnaryPred p );
+
+(4)
+template< class ExecutionPolicy, class ForwardIt, class UnaryPred >
+ForwardIt remove_if( ExecutionPolicy&& policy,
+                     ForwardIt first, ForwardIt last, UnaryPred p );
+```
+
+Removes all elements satisfying specific criteria from the range [first, last) and returns a past-the-end iterator for the new end of the range.
+
+删除所有满足特定条件的元素，返回新范围的end 迭代器
+
+1) Removes all elements that are equal to value (using operator==).
+
+3) Removes all elements for which predicate p returns true.
+
+2,4) Same as (1,3), but executed according to policy.
+ These overloads participate in overload resolution only if
+
+## 可能实现
+### remove
+```cc
+template<class ForwardIt, class T = typename std::iterator_traits<ForwardIt>::value_type>
+ForwardIt remove(ForwardIt first, ForwardIt last, const T& value)
+{
+    first = std::find(first, last, value);
+    if (first != last)
+        for (ForwardIt i = first; ++i != last;)
+            if (!(*i == value))
+                *first++ = std::move(*i);
+    return first;
+}
+```
+
+### remove_if
+```cc
+template<class ForwardIt, class UnaryPred>
+ForwardIt remove_if(ForwardIt first, ForwardIt last, UnaryPred p)
+{
+    first = std::find_if(first, last, p);
+    if (first != last)
+        for (ForwardIt i = first; ++i != last;)
+            if (!p(*i))
+                *first++ = std::move(*i);
+    return first;
+}
+```
+
+## 示例
+```cc
+#include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <complex>
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <vector>
+ 
+int main()
+{
+    std::string str1{"Text with some   spaces"};
+ 
+    auto noSpaceEnd = std::remove(str1.begin(), str1.end(), ' ');
+ 
+    // The spaces are removed from the string only logically.
+    // Note, we use view, the original string is still not shrunk:
+    std::cout << std::string_view(str1.begin(), noSpaceEnd) 
+              << " size: " << str1.size() << '\n';
+ 
+    str1.erase(noSpaceEnd, str1.end());
+ 
+    // The spaces are removed from the string physically.
+    std::cout << str1 << " size: " << str1.size() << '\n';
+ 
+    std::string str2 = "Text\n with\tsome \t  whitespaces\n\n";
+    str2.erase(std::remove_if(str2.begin(), 
+                              str2.end(),
+                              [](unsigned char x) { return std::isspace(x); }),
+               str2.end());
+    std::cout << str2 << '\n';
+ 
+    std::vector<std::complex<double>> nums{{2, 2}, {1, 3}, {4, 8}};
+    #ifdef __cpp_lib_algorithm_default_value_type
+        nums.erase(std::remove(nums.begin(), nums.end(), {1, 3}), nums.end());
+    #else
+        nums.erase(std::remove(nums.begin(), nums.end(), std::complex<double>{1, 3}),
+                   nums.end());
+    #endif
+    assert((nums == std::vector<std::complex<double>>{{2, 2}, {4, 8}}));
+}
+```
+
+输出
+```
+Textwithsomespaces size: 23
+Textwithsomespaces size: 18
+Textwithsomewhitespaces
+```
+
+# transform
+```cc
+(1)
+template< class InputIt, class OutputIt, class UnaryOp >
+OutputIt transform( InputIt first1, InputIt last1,
+                    OutputIt d_first, UnaryOp unary_op );
+
+(2)
+template< class ExecutionPolicy,
+          class ForwardIt1, class ForwardIt2, class UnaryOp >
+ForwardIt2 transform( ExecutionPolicy&& policy,
+                      ForwardIt1 first1, ForwardIt1 last1,
+                      ForwardIt2 d_first, UnaryOp unary_op );
+
+(3)
+template< class InputIt1, class InputIt2,
+          class OutputIt, class BinaryOp >
+OutputIt transform( InputIt1 first1, InputIt1 last1, InputIt2 first2,
+                    OutputIt d_first, BinaryOp binary_op );
+
+(4)
+template< class ExecutionPolicy,
+          class ForwardIt1, class ForwardIt2,
+          class ForwardIt3, class BinaryOp >
+ForwardIt3 transform( ExecutionPolicy&& policy,
+                      ForwardIt1 first1, ForwardIt1 last1,
+                      ForwardIt2 first2,
+                      ForwardIt3 d_first, BinaryOp binary_op );
+```
+
+std::transform applies the given function to the elements of the given input range(s), and stores the result in an output range starting from d_first.
+
+transform 使用 给定的函数 调用 给定的范围每个元素。并存储结果到 d_first 开始的容器
+
+1) The unary operation unary_op is applied to the elements of [first1, last1).
+
+一元操作 unary_op 用于 [first, last1)的元素
+
+ If unary_op invalidates an iterator or modifies an element in any of the following ranges, the behavior is undefined:
+
+如果unary_op 是 iterator 无效，或者修改元素，这种行为是未定义的。
+
+[first1, last1].
+
+The range of std::distance(first1, last1) + 1 elements starting from d_first.
+
+
+3) The binary operation binary_op is applied to pairs of elements from two ranges: [first1, last1) and another range of std::distance(first1, last1) elements starting from first2.
+ If binary_op invalidates an iterator or modifies an element in any of the following ranges, the behavior is undefined:
+
+二元操作 binary_op 被用于 pairs 元素，pairs一个来自 [first, last1), 另一个来自 从 first2 开始的 
+
+[first1, last1].
+The range of std::distance(first1, last1) + 1 elements starting from first2.
+The range of std::distance(first1, last1) + 1 elements starting from d_first.
+
+## 可能的实现
+
+```cc
+template<class InputIt, class OutputIt, class UnaryOp>
+constexpr //< since C++20
+OutputIt transform(InputIt first1, InputIt last1,
+                   OutputIt d_first, UnaryOp unary_op)
+{
+    for (; first1 != last1; ++d_first, ++first1)
+        *d_first = unary_op(*first1);
+ 
+    return d_first;
+}
+```
+
+```cc
+template<class InputIt1, class InputIt2, 
+         class OutputIt, class BinaryOp>
+constexpr //< since C++20
+OutputIt transform(InputIt1 first1, InputIt1 last1, InputIt2 first2,
+                   OutputIt d_first, BinaryOp binary_op)
+{
+    for (; first1 != last1; ++d_first, ++first1, ++first2)
+        *d_first = binary_op(*first1, *first2);
+ 
+    return d_first;
+}
+```
+
+## 注意
+std::transform does not guarantee in-order application of unary_op or binary_op. 
+
+transform 不保证顺序应用 unary_op 或 binary_op
+
+To apply a function to a sequence in-order or to apply a function that modifies the elements of a sequence, use std::for_each.
+
+要按顺序应用函数 对一个序列，修改序列的元素，使用 for_each
+
+```cc
+#include <algorithm>
+#include <cctype>
+#include <iomanip>
+#include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
+ 
+void print_ordinals(const std::vector<unsigned>& ordinals)
+{
+    std::cout << "ordinals: ";
+    for (unsigned ord : ordinals)
+        std::cout << std::setw(3) << ord << ' ';
+    std::cout << '\n';
+}
+ 
+char to_uppercase(unsigned char c)
+{
+    return std::toupper(c);
+}
+ 
+void to_uppercase_inplace(char& c)
+{
+    c = to_uppercase(c);
+}
+ 
+void unary_transform_example(std::string& hello, std::string world)
+{
+    // Transform string to uppercase in-place
+ 
+    std::transform(hello.cbegin(), hello.cend(), hello.begin(), to_uppercase);
+    std::cout << "hello = " << std::quoted(hello) << '\n';
+ 
+    // for_each version (see Notes above)
+    std::for_each(world.begin(), world.end(), to_uppercase_inplace);
+    std::cout << "world = " << std::quoted(world) << '\n';
+}
+ 
+void binary_transform_example(std::vector<unsigned> ordinals)
+{
+    // Transform numbers to doubled values
+ 
+    print_ordinals(ordinals);
+ 
+    std::transform(ordinals.cbegin(), ordinals.cend(), ordinals.cbegin(),
+                   ordinals.begin(), std::plus<>{});
+ 
+    print_ordinals(ordinals);
+}
+ 
+int main()
+{
+    std::string hello("hello");
+    unary_transform_example(hello, "world");
+ 
+    std::vector<unsigned> ordinals;
+    std::copy(hello.cbegin(), hello.cend(), std::back_inserter(ordinals));
+    binary_transform_example(std::move(ordinals));
+}
+```
+
+输出
+```
+hello = "HELLO"
+world = "WORLD"
+ordinals:  72  69  76  76  79 
+ordinals: 144 138 152 152 158
+```
+
+# partition
+
+(1)
+template< class ForwardIt, class UnaryPred >
+ForwardIt partition( ForwardIt first, ForwardIt last, UnaryPred p );
+
+(2)
+template< class ExecutionPolicy, class ForwardIt, class UnaryPred >
+ForwardIt partition( ExecutionPolicy&& policy,
+                     ForwardIt first, ForwardIt last, UnaryPred p );
+
+1) Reorders the elements in the range [first, last) in such a way that all elements for 
+
+重新排序元素，
+
+which the predicate p returns true precede all elements for which predicate p returns false. Relative order of the elements is not preserved.
+
+使谓词返回为true的元素在所有谓词返回为false的元素前面，
+
+元素相对顺序不保留
+
+## 可能的实现
+```cc
+template<class ForwardIt, class UnaryPred>
+ForwardIt partition(ForwardIt first, ForwardIt last, UnaryPred p)
+{
+    first = std::find_if_not(first, last, p);
+    if (first == last)
+        return first;
+ 
+    for (auto i = std::next(first); i != last; ++i)
+        if (p(*i))
+        {
+            std::iter_swap(i, first);
+            ++first;
+        }
+ 
+    return first;
+}
+```
+
+## 示例
+```cc
+#include <algorithm>
+#include <forward_list>
+#include <iostream>
+#include <iterator>
+#include <vector>
+ 
+template<class ForwardIt>
+void quicksort(ForwardIt first, ForwardIt last)
+{
+    if (first == last)
+        return;
+ 
+    auto pivot = *std::next(first, std::distance(first, last) / 2);
+    auto middle1 = std::partition(first, last, [pivot](const auto& em)
+    {
+        return em < pivot;
+    });
+    auto middle2 = std::partition(middle1, last, [pivot](const auto& em)
+    {
+        return !(pivot < em);
+    });
+ 
+    quicksort(first, middle1);
+    quicksort(middle2, last);
+}
+ 
+int main()
+{
+    std::vector<int> v{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::cout << "Original vector: ";
+    for (int elem : v)
+        std::cout << elem << ' ';
+ 
+    auto it = std::partition(v.begin(), v.end(), [](int i) {return i % 2 == 0;});
+ 
+    std::cout << "\nPartitioned vector: ";
+    std::copy(std::begin(v), it, std::ostream_iterator<int>(std::cout, " "));
+    std::cout << "* ";
+    std::copy(it, std::end(v), std::ostream_iterator<int>(std::cout, " "));
+ 
+    std::forward_list<int> fl {1, 30, -4, 3, 5, -4, 1, 6, -8, 2, -5, 64, 1, 92};
+    std::cout << "\nUnsorted list: ";
+    for (int n : fl)
+        std::cout << n << ' ';
+ 
+    quicksort(std::begin(fl), std::end(fl));
+    std::cout << "\nSorted using quicksort: ";
+    for (int fi : fl)
+        std::cout << fi << ' ';
+    std::cout << '\n';
+}
+```
+
+# next distance
+## next
+```cc
+template< class InputIt >
+InputIt next( InputIt it, typename std::iterator_traits<InputIt>::difference_type n = 1 );
+
+template< class InputIt >
+constexpr
+InputIt next( InputIt it, typename std::iterator_traits<InputIt>::difference_type n = 1 );
+```
+
+Return the nth successor (or -nth predecessor if n is negative) of iterator it.
+
+返回迭代器 it 的第n个后续，如果 n为负值，则返回第n 个前续
+
+### 可能的实现 
+
+```cc
+template<class InputIt>
+constexpr // since C++17
+InputIt next(InputIt it, typename std::iterator_traits<InputIt>::difference_type n = 1)
+{
+    std::advance(it, n);
+    return it;
+}
+```
+
+### 注意
+Although the expression ++c.begin() often compiles, it is not guaranteed to do so: c.begin() is an rvalue expression, 
+
+虽然 `++c.begin()` 常常可以编译，但不保证 `c.begin()` 返回一个右值，
+
+and there is no LegacyInputIterator requirement that specifies that increment of an rvalue is guaranteed to work. 
+
+并且 LegacyInputIterator 没有要求 右值的增加操作保证能生效，
+
+In particular, when iterators are implemented as pointers or its operator++ is lvalue-ref-qualified, ++c.begin() does not compile, while std::next(c.begin()) does.
+
+具体而言，当 iterator 被实现为指针或 operator++ 是左值引用限定时， `++c.begin()` 不能编译，但 `std::next(c.begin())` 可以
+
+
+### 示例
+```cc
+#include <iostream>
+#include <iterator>
+#include <vector>
+ 
+int main()
+{
+    std::vector<int> v{4, 5, 6};
+ 
+    auto it = v.begin();
+    auto nx = std::next(it, 2);
+    std::cout << *it << ' ' << *nx << '\n';
+ 
+    it = v.end();
+    nx = std::next(it, -2);
+    std::cout << ' ' << *nx << '\n';
+}
+```
+
+输出
+```
+4 6
+ 5
+```
+
+## distance
+```cc
+template< class InputIt >
+typename std::iterator_traits<InputIt>::difference_type
+    distance( InputIt first, InputIt last );
+```
+Returns the number of hops from first to last.
+
+返回 first 到 last 的跳跃数
+
+If InputIt is not LegacyRandomAccessIterator, the behavior is undefined if last is not reachable from first.
+
+If InputIt is LegacyRandomAccessIterator, the behavior is undefined if first and last are neither reachable from each other.
+
+### 可能的实现
+```cc
+namespace detail
+{
+    template<class It>
+    constexpr // required since C++17
+    typename std::iterator_traits<It>::difference_type 
+        do_distance(It first, It last, std::input_iterator_tag)
+    {
+        typename std::iterator_traits<It>::difference_type result = 0;
+        while (first != last)
+        {
+            ++first;
+            ++result;
+        }
+        return result;
+    }
+ 
+    template<class It>
+    constexpr // required since C++17
+    typename std::iterator_traits<It>::difference_type 
+        do_distance(It first, It last, std::random_access_iterator_tag)
+    {
+        return last - first;
+    }
+} // namespace detail
+ 
+template<class It>
+constexpr // since C++17
+typename std::iterator_traits<It>::difference_type 
+    distance(It first, It last)
+{
+    return detail::do_distance(first, last,
+                               typename std::iterator_traits<It>::iterator_category());
+}
+```
+
+### 示例
+```cc
+#include <iostream>
+#include <iterator>
+#include <vector>
+ 
+int main() 
+{
+    std::vector<int> v{3, 1, 4};
+    std::cout << "distance(first, last) = "
+              << std::distance(v.begin(), v.end()) << '\n'
+              << "distance(last, first) = "
+              << std::distance(v.end(), v.begin()) << '\n';
+              // the behavior is undefined (until LWG940)
+ 
+    static constexpr auto il = {3, 1, 4};
+    // Since C++17 `distance` can be used in constexpr context.
+    static_assert(std::distance(il.begin(), il.end()) == 3);
+    static_assert(std::distance(il.end(), il.begin()) == -3);
+}
+```
+
+输出
+```
+distance(first, last) = 3
+distance(last, first) = -3
+```
 
