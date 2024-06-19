@@ -675,6 +675,8 @@ int main (int argc, char *argv[]) {
 ```
 在给智能指针赋值时，必须使用智能指针，并且不支持隐式类型转换
 
+
+```cc
     //shared_ptr<string> pname = "nico";  // 错误不能使用普通指针
     shared_ptr<string> pname  = make_shared<string>("nico"); // 调用 string::allocator 分配一个对象，并让 shared_ptr 指向他
     shared_ptr<string> pname2{new string("nico")};           // 新语法的构造初始化
@@ -683,11 +685,13 @@ int main (int argc, char *argv[]) {
     shared_ptr<string> pname4;
     //pname4 = new string("nico");    // 错误不能使用普通指针赋值
     pname4.reset(new string("nico")); // 必须用shared_ptr.reset
+```
 
 
 普通指针和shared_ptr使用上的区分
 
 
+```cc
     // 原生new和malloc的需要将右值取地址
     {
         int *n1 = new int; // int 取地址 -> int *
@@ -721,18 +725,20 @@ int main (int argc, char *argv[]) {
         a1[1] = 0;
         // *a1 = 0; // 错误
     }
-
-
+```
 shared_ptr 不能进行 ++, -- 操作，要使用完全指针语义，需要先转换为普通指针
 
+```cc
     shared_ptr<int []> parr(new int [10]);
     for (int i = 0; i < 10; ++i) {
         parr.get()[i] = i;
     }
+```
 
 #### 自定义 deleter
 我们可以声明属于自己的deleter，例如让它在“删除被指向对象”之前先打印一条信息
 
+```cc
     shared_ptr<string> p(new string("nico"),
             [](string *p) {
                 cout << "delete " << *p << endl;
@@ -740,6 +746,7 @@ shared_ptr 不能进行 ++, -- 操作，要使用完全指针语义，需要先�
             }
             );
     p = nullptr; // p指向的对象没有 shared_ptr 引用，析构该对象 
+```
 
 #### 对付 array
 shared_ptr提供的default deleter调用的是delete，不是`delete[]`
@@ -748,21 +755,28 @@ shared_ptr提供的default deleter调用的是delete，不是`delete[]`
 
 很不幸，为array建立一个shared_ptr是可能的，却是错误的
 
+```cc
 shared_ptr<int> p(new int[10]);
+```
 
 你需要自定义deleter
 
+```cc
 shared_ptr<int> p(new int[10],[](int *p) { delete []p;});
+```
 
 也可以使用为 unique_ptr而提供的辅助函数（见5.2.5节第106页）作为 deleter，其内调用`delete[]`：
 
+```cc
 shared_ptr<int> p(new int[10], std::default_delete<int []>());
+```
 
 #### 其他析构策略
 最末一个拥有者——亦即shared pointer——结束生命时，如果清理工作不仅仅是删除内存，你必须明确给出自己的deleter。你可以指定属于自己的析构策略。
 
 第一个例子：假设我们想确保“指向某临时文件”之最末一个reference被销毁时，该文件即被移除。可以这么做：
 
+```cc
 #include <cstdlib>
 #include <unistd.h>
 #include <fstream>
@@ -799,9 +813,11 @@ int main (int argc, char *argv[]) {
 
     return 0;
 }
+```
 
 下面展示如何使用  shared_ptr 利用共享内存
 
+```cc
 #include <cstdlib>
 #include <fcntl.h>
 #include <cstring>
@@ -879,6 +895,7 @@ int main (int argc, char *argv[]) {
     
     return 0;
 }
+```
 
 ### class weak_ptr
 
@@ -897,6 +914,7 @@ int main (int argc, char *argv[]) {
 
 考虑下面示例
 
+```cc
 #include <string>
 #include <memory>
 #include <iostream>
@@ -935,6 +953,7 @@ int main (int argc, char *argv[]) {
     p = initFamily("John");
     return 0;
 }
+```
 
 由于循环引用导致内存泄漏
 
@@ -942,6 +961,7 @@ int main (int argc, char *argv[]) {
 
 使用 weak_ptr 解决
 
+```cc
 class Person {
     public:
         string name;
@@ -953,6 +973,939 @@ class Person {
 
         ...
 };
+```
 
 ![](./pic/5.jpg)
+
+#### 通过weak_ptr 访问对象
+使用 weak_ptr 不能直接访问对象，如
+
+```cc
+p->mother->kids[0]->name
+```
+
+必须先使用 lock
+
+```cc
+p->mother->kids[0].lock()->name
+```
+
+这会导致新产生一个“得自于 kids容器内含之 weak_ptr”的 shared_ptr。
+
+如果obj已经被释放，lock（）会产出一个empty shared_ptr。这种情况下调用`*`或`->`操作符会引发不明确行为。
+
+如果不确定隐身于weak pointer背后的对象是否仍旧存活，你有以下数个选择：
+
+1.调用`expired（）`，它会在weak_ptr不再共享对象时返回true。这等同于检查use_count（）是否为 0，但速度较快。
+
+2.可以使用相应的shared_ptr构造函数明确将weak_ptr转换为一个shared_ptr。如果被指对象已经不存在，该构造函数会抛出一个 bad_weak_ptr 异常，那是一个派生自`std：：exception`的异常，其`what（）`会产出＂bad_weak_ptr＂。
+
+3.调用 `use_count（）`，询问相应对象的拥有者数量。如果返回 0 表示不存在任何有效对象。然而请注意，通常只应为了调试而调用 `use_count（）`；C++标准库明确告诉我们：“`use_count（）`并不总是很有效率。”
+
+### 误用 shared_ptr
+常见的误用是 ： 
+
+由于循环依赖（cyclic dependency）造成的“dangling pointer”（空荡指针）。
+
+另一个可能出现的问题是，你必须确保某对象只被一组（one group of） shared pointer拥有。下面的代码是错的：
+
+```cc
+int * p = new int;
+shared_ptr<int> sp1(p);
+shared_ptr<int> sp2(p); // 错误，两个shared_ptr管理结构被创建
+```
+
+问题出在sp1和sp2都会在丢失p的拥有权时释放相应资源（亦即调用delete）。
+
+因此，你应该总是在创建对象和其相应资源的那一刻直接设立smart pointer：
+
+```cc
+int *p = new int;
+shared_ptr<int> sp1(p);     // 指针有效后立即绑定 shared_ptr, 会分配一个 shared_ptr manager
+shared_ptr<int> sp2(sp1);   // 当需要多处引用时，让多个 shared_ptr 使用一个 shared_ptr manager
+```
+
+这个问题也可能间接发生。在先前介绍过的例子中，假设我们打算为Person引入一个成员函数，用来建立“从kid指向parent”的reference及其反向reference：
+
+```cc
+void Person::setParentAndTheirKids(shared_ptr<Person> m = nullptr,
+        shared_ptr<Person> f = nullptr) {
+    mother = m;
+    father = f;
+
+    // 错误：this指针 被两个 shared_ptr manager 引用
+    if (m != nullptr) {
+       m->kids.push_back(shared_ptr<Person>(this)); 
+    }
+    if (f != nullptr) {
+       f->kids.push_back(shared_ptr<Person>(this)); 
+    }
+}
+
+shared_ptr<Person> mom(new Person(name + "'s mon"));
+shared_ptr<Person> dad(new Person(name + "'s dad"));
+shared_ptr<Person> kid(new Person(name, mom, dad));
+kid->setParentAndTheirKids(mom, dad);
+```
+
+正确的写法
+
+```cc
+class Person : public enable_shared_from_this<Person> {
+    public:
+        string name;
+        shared_ptr<Person> mother;
+        shared_ptr<Person> father;
+
+        ...
+
+        void setParentAndTheirKids(shared_ptr<Person> m = nullptr,
+                shared_ptr<Person> f = nullptr) {
+            mother = m;
+            father = f;
+
+            if (m != nullptr) {
+                m->kids.push_back(shared_from_this());
+            }
+            if (f != nullptr) {
+                f->kids.push_back(shared_from_this());
+            }
+        }
+
+        ...
+};
+```
+
+
+注意 要使用 `shared_from_this()` 必须继承 `enable_shared_from_this<> `
+
+并且 `shared_from_this()` 不能在构造函数中使用
+
+### 详细研究 shared_ptr weak_ptr
+#### 细究 shared_ptr
+
+Class shared_ptr＜＞被模板化，模板参数是“原始pointer所指对象”的类型：
+
+```cc
+  template<typename _Tp>
+    class shared_ptr : public __shared_ptr<_Tp>
+    {
+      using element_type = typename __shared_ptr<_Tp>::element_type;
+          using element_type = typename remove_extent<_Tp>::type;
+                { typedef _Tp     type; };
+
+      element_type*	   _M_ptr;         // Contained pointer.
+      __shared_count<_Lp>  _M_refcount;    // Reference counter.
+```
+
+
+元素类型可以是void，意味着shared pointer共享的对象有着一个未具体说明的类型，例如`void*`。
+
+一个empty shared_ptr并不能分享对象拥有权，所以`use_count（）`返回0。然而请注意，由于设计了一个特殊构造函数，使得empty shared pointer还是可以指向对象。
+
+如果shared pointer取得一个新值（不论是由于被赋予新值或由于调用reset（）），相同事情发生：如果shared pointer先前拥有某对象，而且它是最末一个拥有者，相应的deleter（或delete）会为此对象而被调用。
+
+Shared pointer可能使用不同的对象类型，前提是存在一个隐式的pointer转换。基于此，构造函数、赋值操作符和reset（）都是member template，比较操作符则针对不同类型模板化。
+
+每一个比较操作符所比较的都是shared pointer内部那个raw pointer（也就是说，它们对get（）的返回值调用同一操作符）。它们全都有“接受nullptr为实参”的重载版本。因此你可以检查是否带有一个合法pointer，甚至检查是否raw pointer小于或大于nullptr。
+
+构造函数收到的实参如果是个 weak_ptr而且是empty（亦即 expired（）产出 true），会抛出bad_weak_ptr异常
+
+![](./pic/6.jpg)
+
+![](./pic/7.jpg)
+
+get_deleter（）会取得一个pointer to deleter（如果有定义deleter的话），要不就取得nullptr。
+
+只要shared pointer还拥有那个deleter，该pointer就有效。然而为了取得deleter，你必须以其类型作为template实参
+
+```cc
+    auto del = [](int *p) {
+        delete p;
+    };
+    shared_ptr<int> pint(new int);
+    decltype(del) *pd = get_deleter<decltype(del)>(p);
+```
+
+
+#### 更复杂的 shared_ptr 使用示例
+
+两个 shared_ptr 共享一个对象的所有权，但指向不同地址
+
+```cc
+    struct X {
+        int a;
+    };
+    shared_ptr<X> px(new X);
+    // pi 拷贝 px 的对象所有权，但 pi 指向 px->a
+    shared_ptr<int> pi(px, &px->a);
+```
+
+
+`make_shared（）`和`allocate_shared（）`都用来优化“被共享对象及其相应之控制区块（如用以维护使用次数）”的创建。注意
+
+下面方法的效率低，因为调用了两次 new, 第一次用于创建 X , 第二次用于创建 shared_ptr 控制块
+
+```cc
+shared_ptr<X> (new X())
+```
+
+使用下面方法优化，会快很多, 且更安全，因为他只调用一次 new
+
+```cc
+make_shared<X>(..)
+```
+
+allocate_shared（）允许传入你自己的allocator作为第一实参。
+
+shared_ptr 支持 cast(类型转换 ) , 但是必须使用他提供的接口
+
+```cc
+    shared_ptr<void> sp = make_shared<int>(0);
+    // 必须重新定义一个 shared_ptr<int> 接受类型转换的结果
+    // 不能重复使用sp ，因为 sp 在编译时已经确定了类型为 shared_ptr<void>
+    shared_ptr<int> pi = static_pointer_cast<int>(sp);
+    sp.reset();
+    *pi = 10;
+```
+
+
+#### 研究 weak_ptr
+weak_ptr是shared_ptr的帮手，用来共享对象但不拥有对象。它的use_count（）返回的是对象被shared_ptr拥有的次数，至于weak_ptr对它的共享次数是不计的。
+
+而且weak_ptr可以为空（empty）——如果它不是以一个shared_ptr为初值或其对应对象的最末一个拥有者被删除就会发生这种情况。
+
+Default 构造函数会创建出一个 empty weak pointer，那意味着 expired（） 的结果是true。
+
+由于lock（）会产出一个shared pointer，因此在那个shared pointer寿命期间，该对象的使用次数会多1。这是处理weak pointer所共享的对象的唯一途径。
+
+![](./pic/8.jpg)
+
+#### 线程安全
+shared pointer并非线程安全。
+
+当你在多个线程中以shared pointer指向同一对象，你必须使用诸如mutex或lock等技术。
+
+不过当某个线程改变对象时，其他线程读取其使用次数并不会导致data race，虽然读到的值有可能不是最新的。
+
+```cc
+shared_ptr<int> global;
+
+void foo() {
+    // 线程函数中操作局部的 shared_ptr
+    shared_ptr<int> local = make_shared<int>(0);
+    // ...
+    // 当完成操作后，将结果传递到全局
+    std::atomic_store(&global, local);
+}
+```
+
+
+[](./pic/9.jpg)
+
+
+### unique_ptr
+unique_ptr是C++标准库自C++11起开始提供的类型。它是一种在异常发生时可帮助避免资源泄漏的smart pointer。
+
+一般而言，这个smart pointer实现了独占式拥有概念，意味着它可确保一个对象和其相应资源同一时间只被一个pointer拥有。
+
+一旦拥有者被销毁或变成empty，或开始拥有另一个对象，先前拥有的那个对象就会被销毁，其任何相应资源亦会被释放。
+
+#### unique_ptr的目的
+函数往往以下列方式运作：[13]
+
+1.获得某些资源
+
+2.执行某些操作
+
+3.将取得的资源释放掉
+
+如下面的例子
+
+```cc
+void f() {
+    ClassA *ptr = new ClassA; // 创建资源
+    ...                       // 处理资源
+    delete ptr;               // 释放资源
+}
+```
+
+一个较不明显的危险是它可能抛出异常，那将立刻退离函数，末尾的释放资源语句也就没机会被调用，导致资源泄漏。
+
+为了避免如此的资源泄漏，通常函数会捕捉所有异常，例如：
+
+```cc
+void f() {
+    ClassA *ptr= new ClassA; // 创建资源
+
+    try {                    // 安全的处理资源
+        ...
+    }
+    catch (...) {            // 异常时释放资源
+        delete ptr;
+        throw;
+    }
+
+    delete ptr;              // 正常时释放资源
+}
+```
+
+
+为了在异常发生时能够适当处理好对象的删除，代码变得比较复杂，而且累赘。如果第二个对象也以此方式处理，或需要一个以上的catch子句，情况会变得更糟。
+
+这是一种不好的编程风格，应该避免，因为它复杂而又容易出错。
+
+对此，smart pointer可以带来帮助。Smart pointer可以在它自身被销毁时释放其所指向的数据。
+
+而且，由于它是个local变量，所以会在函数结束时被自动销毁——不论是正常结束或异常结束。Class unique_ptr就是这样的一个smart pointer。
+
+unique_ptr是“其所指向之对象”的唯一拥有者。自然而然地，当unique_ptr被销毁，其所指向的对象也就自动被销毁。unique_ptr的必要条件就是，它指向的对象只有一个拥有者。
+
+用unique_ptr改写先前的例子如下：
+
+```cc
+#include <memory>
+
+void f() {
+    std::unique_ptr<ClassA> ptr(new ClassA);
+    ...
+}
+```
+
+#### 使用 unique_ptr
+
+unique_ptr有着与寻常pointer非常相似的接口，操作符`*`用来提领（dereference）指向对象，操作符`->`用来访问成员——如果被指向的对象来自class或struct
+
+```cc
+    unique_ptr<string> up(new string("Hello"));
+    (*up)[0] = 'h';
+    up.get()[2] = 'E';
+    up->append("world");
+    cout << *up << endl;
+```
+
+然而它不提供pointer算术如++等，这被视为优点，因为 pointer算术运算往往是麻烦的来源。
+
+注意，`class unique_ptr＜＞`不允许你以赋值语法将一个寻常的pointer当作初值。因此你必须直接初始化unique_ptr，像下面这样：
+
+```cc
+        // unique_ptr<int> up = new int; // errr
+        unique_ptr<int> up(new int);
+```
+
+你也可以对它赋予nullptr或调用reset（）：
+
+```cc
+        up = nullptr;
+        up.reset();
+```
+
+此外，你可以调用release（），获得unique_ptr拥有的对象并放弃拥有权，于是调用者现在对该对象有了责任：
+
+```cc
+    string *sp = up.release();
+    int *isp = iup.release();
+```
+
+你可以调用操作符bool（）用以检查是否unique pointer拥有（任何）对象：
+
+```cc
+    if (up)
+        cout << *up << endl;
+```
+
+你也可以拿unique pointer和 nullptr比较，或查询 unique_ptr内的raw pointer——如果unique_ptr未拥有任何对象，就会获得一个nullptr：
+
+```cc
+    if (up != nullptr)
+        cout << *up << endl;
+
+    if (up.get() != nullptr)
+        cout << *up << endl;
+```
+
+#### 转移 unique_ptr 拥有权
+unique_ptr提供的语义是“独占式拥有”。然而其实责任在程序员，由他/她确保“没有任何两个unique pointer以同一个pointer作为初值”：
+
+```cc
+        string *sp = new string("Hello");
+        unique_ptr<string> up1(sp);
+        unique_ptr<string> up2(sp); // Error
+```
+
+要进行所有权转移，需使用 right copy
+
+```cc
+        string *sp = new string("Hello");
+        unique_ptr<string> up1(sp);
+        unique_ptr<string> up2;
+        // up2 = up1; // error
+        up2 = std::move(up1);
+        cout << *up2 << endl;;
+```
+
+当所有权转移时，原有的obj会被delete
+
+```cc
+        string *sp = new string("Hello");
+        unique_ptr<string> up(sp);
+        up = unique_ptr<string>(new string("aaa")); // hello 会被delete
+```
+
+#### unique_ptr 和函数
+
+利用所有权转移，可以实现函数参数或返回值传递 obj
+
+```cc
+unique_ptr<string> sink(unique_ptr<string> up)
+{
+    if (up)
+        cout << *up << endl;
+    // 返回时会创建临时对象 X
+    // X = up;
+    return up;
+}
+
+int main (int argc, char *argv[]) {
+
+    unique_ptr<string> up(new string("hello"));
+    // 临时对象是右值， up2 = X; 调用 operator=(unique_ptr<string>&&)
+    unique_ptr<string> up2 = sink(std::move(up));
+
+    return 0;
+}
+```
+
+#### unique_ptr 做成员
+在class内使用unique_ptr可避免资源泄漏。如果你使用unique_ptr取代寻常pointer，就不再需要析构函数，因为对象被删除会连带使所有成员被删除。
+
+此外 unique_ptr也可协助避免“对象初始化期间因抛出异常而造成资源泄漏”。
+
+注意，只有当一切构造动作都完成了，析构函数才有可能被调用。因此一旦构造期间发生异常，只有那些已完全构造好的对象，其析构函数才会被调用。
+
+所以，对于“拥有多个raw pointer”的class，如果构造期间第一个new成功而第二个失败，就可能导致资源泄漏。例如：
+
+```cc
+class B {
+    public:
+        // 如果第二个new 失败，可能内存泄漏
+        B(int v1, int v2)
+        :m_p1(new A(v1)), m_p2(new A(v2)) {}
+
+        // 如果第二个new 失败，可能内存泄漏
+        B(const B &x)
+        :m_p1(new A(*x.m_p1)), m_p2(new A(*x.m_p2)) {}
+
+        ~B() {
+            delete m_p1;
+            delete m_p2;
+        }
+
+        B &operator=(const B &x) {
+            *m_p1 = *x.m_p1;
+            *m_p2 = *x.m_p2;
+            return *this;
+        }
+
+    private:
+        A *m_p1;
+        A *m_p2;
+};
+```
+
+使用unique_ptr，就可以避免上述可能的资源泄漏：
+
+```cc
+class B {
+    public:
+        // 不可能内存泄漏
+        B(int v1, int v2)
+        :m_p1(new A(v1)), m_p2(new A(v2)) {}
+
+        // 不可能内存泄漏
+        B(const B &x)
+        :m_p1(new A(*x.m_p1)), m_p2(new A(*x.m_p2)) {}
+
+        B &operator=(const B &x) {
+            // 修改 unique_ptr 指向的 obj，而非unique_ptr 
+            // 所以不需要 move
+            *m_p1 = *x.m_p1;
+            *m_p2 = *x.m_p2;
+            return *this;
+        }
+
+        // 不需要析构
+
+    private:
+        unique_ptr<A> m_p1;
+        unique_ptr<A> m_p2;
+};
+```
+
+
+#### 处理 array
+
+C++语言又规定，对于array应该使用delete[]而不是delete，所以下面的语句是错误的
+
+```cc
+        unique_ptr<string> up(new string[10]); // Error
+        shared_ptr<string> up(new string[10]); // Error
+```
+
+对于shared_ptr 可以这样，或者自定义 deleter
+
+但是太麻烦了，
+
+很幸运地，C++标准库为class unique_ptr提供了一个偏特化版本用来处理array，这个版本会在遗失其所指对象的拥有权时，对该对象调用`delete[]`。你只需这么声明：
+
+```cc
+        shared_ptr<string[]> up(new string[10]);
+        unique_ptr<string[]> up(new string[10]);
+```
+
+然而请注意，这个偏特化版本提供的接口稍有不同。它不再提供操作符*和-＞，改而提供操作符[]，用以访问其所指向的array中的某一个对象：
+
+```cc
+        // cout << *up << endl; // error
+        cout << up[0] << endl;
+```
+
+#### Class default_delete＜＞
+
+让我们把目光移近class unique_ptr的声明式。概念上，这个class被声明如下
+
+
+```cc
+  template <typename _Tp, typename _Dp = default_delete<_Tp>>
+    class unique_ptr
+    {
+        ...
+      typename add_lvalue_reference<element_type>::type
+      operator*() const
+      {
+	__glibcxx_assert(get() != pointer());
+	return *get();
+      }
+
+      /// Return the stored pointer.
+      pointer
+      operator->() const noexcept
+      {
+	_GLIBCXX_DEBUG_PEDASSERT(get() != pointer());
+	return get();
+      }
+      ...
+    };
+
+  template<typename _Tp, typename _Dp>
+    class unique_ptr<_Tp[], _Dp>
+    {
+        ...
+      operator[](size_t __i) const
+      {
+	__glibcxx_assert(get() != pointer());
+	return get()[__i];
+      }
+      ...
+    };
+```
+
+
+可以看出，其中有个特殊版本负责处理array。该版本提供操作符[]而非*和-＞，用以处理array而非单一对象。但二者都使用class std：：default_delete＜＞作为 deleter，那又被特化使得面对array时调用delete[]而非delete：
+
+```cc
+  template<typename _Tp>
+    struct default_delete<_Tp[]>
+    {
+          ..
+      void
+      operator()(_Tp* __ptr) const
+      {
+	static_assert(!is_void<_Tp>::value,
+		      "can't delete pointer to incomplete type");
+	static_assert(sizeof(_Tp)>0,
+		      "can't delete pointer to incomplete type");
+	delete __ptr;
+      }
+        ..
+    };
+
+  template<typename _Tp>
+    struct default_delete<_Tp[]>
+    {
+        ..
+      template<typename _Up>
+	typename enable_if<is_convertible<_Up(*)[], _Tp(*)[]>::value>::type
+	operator()(_Up* __ptr) const
+	{
+	  static_assert(sizeof(_Tp)>0,
+			"can't delete pointer to incomplete type");
+	  delete [] __ptr;
+	}
+        ..
+    };
+```
+
+#### 其他相应资源的Deleter
+当你所指向的对象要求的不只是调用delete或`delete[]`，你就必须具体指定自己的deleter。
+
+然而此处deleter的定义方式略略不同于shared_ptr。你必须具体指明deleter的类型作为第二个template 实参。
+
+该类型可以是个reference to function，或是个function pointer或function object。
+
+如果是个function object，其function call操作符（）应该接受一个“指向对象”的pointer。
+
+举个例子，以下代码在delete对象之前先打印一份额外信息：
+
+```cc
+class MyDeleter {
+    public:
+        void operator() (B * p) {
+            cout << "call delete for B obj" << endl;
+            delete p;
+        }
+};
+
+unique_ptr<B, MyDeleter> up(new B(1, 2));
+```
+
+如果你给的是个函数或lambda，你必须声明deleter的类型为`void（*）（T*）`或`std：：function＜void（T*）＞`，要不就使用decltype。
+
+例如，若要为一个array of int指定自己的deleter，并以lambda形式呈现，应该写：
+
+```cc
+    unique_ptr<int, void (*)(int *)> up(new int[10],
+            [](int *p) {
+            delete [] p;
+            } );
+```
+
+
+或
+
+```cc
+    unique_ptr<int, function<void (int *)>> up(new int[10],
+            [](int *p) {
+            delete [] p;
+            } );
+```
+
+或
+
+```cc
+    auto l = [] (int *p) {
+        delete [] p;
+    };
+
+    unique_ptr<int, decltype(l)> up(new int[10], l);
+```
+
+为了避免“传递function pointer或lambda时必须指明deleter的类型”，你可以使用所谓的alias template，这是自C++11起提供的语言特性
+
+```cc
+template <typename T>
+using uniquePtr = std::unique_ptr<T, void (*)(T*)>;
+
+void main () {
+    uniquePtr<int> up(new int[10], 
+            [](int *p) {
+            delete [] p;
+            });
+}
+```
+
+#### 细究 unique_ptr
+![](./pic/10.jpg)
+
+
+## Type Trait和Type Utility
+Type trait，由TR1引入而在C++11中大幅扩展的一项机制，定义出因type而异的行为。它们可被用来针对type优化代码，以便提供特别能力。
+
+### Type Trait的目的
+所谓type trait，提供一种用来处理type属性（property of a type）的办法。它是个template，可在编译期根据一或多个template实参（通常也是type）产出一个type或value。
+
+
+### Reference Wrapper（外覆器）
+对于一个给定类型T，这个class提供ref（）用以隐式转换为 T&，一个cref（）用以隐式转换为 const T&，
+
+这往往允许function template得以操作reference而不需要另写特化版本。
+
+template <typename T>
+void foo(T val);
+
+int x;
+foo (std::ref(x));  // T变成 int &
+
+int x
+foo (std::cref(x)); // T变成 const int &
+
+### Function Type Wrapper（外覆器）
+
+使用 function<> 可以将普通函数和lambda 转换为函数对象。
+
+void foo(int a, int b)
+{
+    cout << a << "-- " << b << endl;
+}
+
+int main (int argc, char *argv[]) {
+
+    vector<function<void (int, int)>> tasks;
+
+    tasks.push_back([](int a, int b) {cout << a << b << endl;});
+    tasks.push_back(foo);
+
+    for (function<void (int, int)> pos : tasks) {
+        pos(1, 2);
+    }
+    
+    return 0;
+}
+
+使用member function时，`function<>` 的第一个形参必须为类
+
+class A {
+    public:
+        void fun(int a, int b) const {
+            cout << "A : " << a << b << endl;
+        }
+};
+
+int main (int argc, char *argv[]) {
+
+    function<void (const A&, int, int)> f;
+    f = &A::fun;
+    f(A(), 1, 2 );
+ 
+## 辅助函数
+C++标准库提供若干小型辅助函数，用来挑选最小值、挑选最大值、交换两值或提供增补的比较操作符。
+
+### min max
+
+[](./pic/11.jpg)
+
+其中 Compare 可以是 function 或 function object
+
+### swap
+
+  template<typename _Tp>
+    inline void
+    swap(_Tp& __a, _Tp& __b)
+    {
+      _Tp __tmp = _GLIBCXX_MOVE(__a);
+      __a = _GLIBCXX_MOVE(__b);
+      __b = _GLIBCXX_MOVE(__tmp);
+    }
+
+在其内部，数值被moved或被move assigned
+
+swap（） 的最大优势在于，通过 template specialization （模板特化）或 function overloading （函数重载），我们可以为更复杂的类型提供特殊实现版本；
+
+这些特殊实现有可能交换内部成员，而非对对象赋值，这无疑大大节省了时间。
+
+class MyArray {
+    private:
+        int *elems;
+        int numElems;
+    public:
+        void swap(MyArray &x) {
+            // 利用std::swap进行快速实现复杂的swap
+            std::swap(elems, x.elems);
+            std::swap(numElems, x.numElems);
+        }
+};
+
+// 重载全局的swap
+inline void swap(MyArray &a1, MyArray &a2)
+{
+    a1.swap(a2);
+}
+
+### 增补的比较操作符 
+有四个function template分别定义了！=、＞、＜=和＞=四个比较操作符。它们都是利用操作符==和＜完成。这四个函数定义于＜utility＞，通常被定义如下：
+
+  namespace rel_ops
+  {
+    template <class _Tp>
+      inline bool
+      operator!=(const _Tp& __x, const _Tp& __y)
+      { return !(__x == __y); }
+
+    template <class _Tp>
+      inline bool
+      operator>(const _Tp& __x, const _Tp& __y)
+      { return __y < __x; }
+
+    template <class _Tp>
+      inline bool
+      operator<=(const _Tp& __x, const _Tp& __y)
+      { return !(__y < __x); }
+
+    template <class _Tp>
+      inline bool
+      operator>=(const _Tp& __x, const _Tp& __y)
+      { return !(__x < __y); }
+  }
+
+只需定义好＜和==操作符就可以使用它们。只要写上`using namespace std：：rel_ops`，上述四个比较操作符就自动获得了定义。例如：
+
+class MyArray {
+    public:
+        bool operator==(const MyArray &x) const;
+        bool operator<(const MyArray &x) const;
+};
+
+void foo()
+{
+    using namespace std::rel_ops;
+
+    MyArray a1, a2;
+    if (a1 != a2) {
+    }
+
+    if (a1 > a2) {
+    }
+}
+
+### 编译期分数计算
+Ratio utility是一个多用途工具，由Walter E.Brown发起，允许我们轻易且安全地在编译期间计算分数
+
+###  Clock和Timer
+C++11开始提供一个精度中立（precision-neutral）的程序库，它常被称为chrono程序库，因为它的特性被定义于＜chrono＞。
+
+此外，C++标准库也提供一个基本的C和POSIX接口，用来处理日历时间。你可以使用也始自C++11的thread程序库，等待某个线程或程序（主线程）一段时间。
+
+# 标准模板库
+
+## 组件
+若干精心勾画的组件共同合作，构筑起STL的基础。这些组件中最关键的是容器、迭代器和算法。
+
+- 容器（Container），用来管理某类对象的集合。每一种容器都有其优点和缺点，所以，为了应付不同的需求，STL准备了不同的容器类型。
+- 迭代器（Iterator），用来在一个对象集合（collection of objects）内遍历元素。这个对象集合或许是个容器，或许是容器的一部分。迭代器的主要好处是，为所有各式各样的容器提供了一组很小的共通接口。例如其中一个操作是行进至集合内的下一元素。至于如何做到当然取决于集合的内部结构。不论这个集合是array或tree或hash table，此一行进动作都能成功，因为每一种容器都提供了自己的迭代器，而这些迭代器了解容器的内部结构，知道该做些什么。
+- 算法（Algorithm），用来处理集合内的元素。它们可以出于不同的目的而查找、排序、修改、使用元素。通过迭代器的协助，我们只需撰写一次算法，就可以将它应用于任意容器，因为所有容器的迭代器都提供一致的接口。
+
+你还可以提供一些特殊的辅助函数供算法调用，从而获取更佳的灵活性。这样你就可以一方面运用标准算法，一方面配合自己特殊或复杂的需求。
+
+STL 的基本观念就是将数据和操作分离。数据由容器类加以管理，操作则由可定制（configurable）的算法定义之。
+
+迭代器在两者之间充当黏合剂，使任何算法都可以和任何容器交互运作。
+
+[](./pic/12.jpg)
+
+STL甚至提供更泛化的组件。借由特定的适配器（adapter）和函数对象（function ob-ject，functor），你可以补充、约束或定制算法以满足特别需求。
+
+## 容器 
+
+容器用来管理一大群元素。为了适应不同需要，STL提供了不同的容器，
+
+[](./pic/13.jpg)
+
+总的来说，容器可分为三大类：
+
+1. 序列式容器（Sequence container），这是一种有序（ordered）集合，其内每个元素均有确凿的位置——取决于插入时机和地点，与元素值无关。
+
+如果你以追加方式对一个集合置入6个元素，它们的排列次序将和置入次序一致。
+
+STL提供了5个定义好的序列式容器：array、vector、deque、list和forward_list。[1]
+
+2. 关联式容器（Associative container），这是一种已排序（sorted）集合，元素位置取决于其value（或key——如果元素是个key/value pair）和给定的某个排序准则。
+
+如果将6个元素置入这样的集合中，它们的值将决定它们的次序，和插入次序无关。
+
+STL提供了4个关联式容器：set、multiset、map和multimap。
+
+3. 无序容器（Unordered （associative） container），这是一种无序集合（unordered collec-tion），其内每个元素的位置无关紧要，唯一重要的是某特定元素是否位于此集合内。
+
+元素值或其安插顺序，都不影响元素的位置，而且元素的位置有可能在容器生命中被改变。
+
+如果你放6个元素到这种集合内，它们的次序不明确，并且可能随时间而改变。
+
+STL内含4个预定义的无序容器：unordered_set、unordered_multiset、unordered_map和unordered_multimap。
+
+### Sequence container
+STL内部预先定义好了以下序列式容器：
+- Array（其class名为array）
+- Vector
+- Deque
+- List(singly/doubly linked)
+
+
+#### Vector
+
+Vector将其元素置于一个dynamic array中管理。它允许随机访问，也就是说，你可以利用索引直接访问任何一个元素。
+
+在array尾部附加元素或移除元素都很快速，[3]但是在array的中段或起始段安插元素就比较费时，因为安插点之后的所有元素都必须移动，以保持原本的相对次序。
+
+
+#### Deque
+
+所谓deque（发音类似“check”[4]），是“double-ended queue”的缩写。它是一个dynamic array，可以向两端发展，因此不论在尾部或头部安插元素都十分迅速。
+
+在中间部分安插元素则比较费时，因为必须移动其他元素。
+
+#### Array
+
+一个array[5]对象乃是在某个固定大小的array （有时称为一个static array或C array）内管理元素。
+
+因此，你不可以改变元素个数，只能改变元素值。你必须在建立时就指明其大小。
+
+Array也允许随机访问，意思是你可以直接访问任何一个元素——只要你指定相应的索引。
+
+#### List
+
+从历史角度看，我们只有一个list class。然而自C++11 开始，STL 竟提供了两个不同的list 容器：`class list＜＞` 和`class forward_list＜＞`。
+
+因此， list 可能表示其中某个class，或者是个总体术语，代表上述两个 list class。
+
+然而就某种程度来说，forward list 只不过是受到更多限制的list，现实中二者的差异并不怎么重要。
+
+因此当我使用术语list，通常我指的是`class list＜＞`，它的能力往往超越`class forward_list＜＞`。
+
+如果特别需要指出`class forward_list＜＞`，我会使用术语forward list。所以本节讨论的是寻常的list，是一开始就成为STL一部分的那个东西。
+
+`list＜＞`由双向链表（doubly linked list）实现而成。这意味着list内的每个元素都以一部分内存指示其前导元素和后继元素。
+
+List不提供随机访问，因此如果你要访问第10个元素，你必须沿着链表依次走过前9个元素。
+
+不过，移动至下一个元素或前一个元素的行为，可以在常量时间内完成。因此一般的元素访问动作会花费线性时间，因为平均距离和元素数量成比例。
+
+这比vector和deque提供的摊提式（amortized）常量时间，效率差很多。
+
+List 的优势是：在任何位置上执行安插或删除动作都非常迅速，因为只需改变链接（link）就好。这表示在list中段处移动元素比在vector和deque快得多。
+
+#### Forward List
+
+自C++11之后，C++标准库提供了另一个list容器：forward list。`forward_list＜＞`是一个由元素构成的单向（singly） linked list。
+
+就像寻常 list那样，每个元素有自己一段内存，为了节省内存，它只指向下一元素。
+
+因此，forward list原则上就是一个受限的list，不支持任何“后退移动”或“效率低下”的操作。基于这个原因，它不提供成员函数如push_back（）乃至size（）。
+
+现实中，这个限制比乍听之下甚至更尴尬棘手。问题之一是，你无法查找某个元素然后删除它，或是在它的前面安插另一个元素。
+
+因为，为了删除某个元素，你必须位于其前一元素的位置上，因为正是那个元素才能决定
+
+### Associative Container
+
+关联式容器依据特定的排序准则，自动为其元素排序。
+
+元素可以是任何类型的value，也可以是key/value pair，其中key可以是任何类型，映射至一个相关value，而value也可以是任意类型。排序准则以函数形式呈现，
+
+用来比较value，或比较key/value中的key。默认情况下所有容器都以操作符＜进行比较，不过你也可以提供自己的比较函数，定义出不同的排序准则。
+
+通常关联式容器由二叉树（binary tree）实现出来。在二叉树中，每个元素（节点）都有一个父节点和两个子节点；左子树的所有元素都比自己小，右子树的所有元素都比自己大。关联式容器的差别主要在于元素的种类以及处理重复元素时的方式（态度）。
+
+关联式容器的主要优点是，它能很快找出一个具有某特定value的元素，因为它具备对数复杂度（logarithmic complexity），而任何循序式容器的复杂度是线性。因此，使用关联式容器，面对1 000个元素，平均而言你将有10次而不是500次比较动作。然而它的一个缺点是，你不能直接改动元素的value，因为那会破坏元素的自动排序。
+
+下面是STL定义的关联式容器：
+
+- Set 元素依据其value自动排序，每个元素只能出现一次，不允许重复。
+- Multiset 和set的唯一差别是：元素可以重复。也就是multiset可包括多个“value相同”的元素。
+- Map 每个元素都是key/value pair，其中key是排序准则的基准。每个key只能出现一次，不允许重复。Map也可被视为一种关联式数组（associative array），也就是“索引可为任意类型”的数组
+- Multimap 和map的唯一差别是：元素可以重复，也就是multimap允许其元素拥有相同的key。Multimap可被当作字典（dictionary）使用。
+
+所有关联式容器都有一个可供选择的template实参，指明排序准则；默认采用操作符＜。排序准则也被用来测试等同性（equivalence）：[7]如果两个元素的value/key互不小于对方，则两者被视为重复。
+
+你可以将set视为一种特殊的map：元素的value等同于key。实际产品中所有这些关联式容器通常都由二叉树（binary tree）实现而成。
+
 
