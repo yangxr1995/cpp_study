@@ -656,14 +656,14 @@ int main (int argc, char *argv[]) {
     who_make_coffee.push_back(pjutta);
     who_make_coffee.push_back(pnico);
 
-    for (auto p : who_make_coffee) {
+    for (auto &p : who_make_coffee) {
         cout << *p << " ";
     }
     cout << endl;
 
     *pnico = "Nicolai";
  
-    for (auto p : who_make_coffee) {
+    for (auto &p : who_make_coffee) {
         cout << *p << " ";
     }
     cout << endl;
@@ -1907,5 +1907,583 @@ List 的优势是：在任何位置上执行安插或删除动作都非常迅速
 所有关联式容器都有一个可供选择的template实参，指明排序准则；默认采用操作符＜。排序准则也被用来测试等同性（equivalence）：[7]如果两个元素的value/key互不小于对方，则两者被视为重复。
 
 你可以将set视为一种特殊的map：元素的value等同于key。实际产品中所有这些关联式容器通常都由二叉树（binary tree）实现而成。
+
+#### Set Multiset 示例
+
+#include <set>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    multiset<string> ms = {"dd", "ee"};
+
+    ms.insert("cc");
+    ms.insert("bb");
+    ms.insert("aa");
+
+    for (string &pos : ms) {
+        cout << pos << " ";
+    }
+    cout << endl;
+
+    return 0;
+}
+
+#### Map Multimap 示例
+#include <map>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    map<int, string> coll;
+
+    coll = {
+        {2, "bb"},
+        {4, "dd"},
+        {1, "aa"},
+        {3, "cc"},
+    };
+
+    for (auto &pos : coll) {
+        cout << pos.second << " ";
+    }
+    cout << endl;
+
+    return 0;
+}
+
+### Unordered Container
+在无序（unordered）容器中，元素没有明确的排列次序。也就是如果安插3个元素，当你迭代容器内的所有元素时会发现，它们的次序有各种可能。
+
+如果安插第4个元素，先前3个元素的相对次序可能会被改变。
+
+我们唯一关心的是，某个特定元素是否位于容器内。甚至如果你有2个这种容器，其内有着完全相同的元素，元素的排列次序也可能不同。试着想象它是个袋子（bag）。
+
+无序（unordered）容器常以hash table实现出来），内部结构是一个“由linked list 组成”的array。
+
+通过某个hash 函数的运算，确定元素落于这个array 的位置。Hash函数运算的目标是：让每个元素的落点（位置）有助于用户快速访问
+
+![](./pic/14.jpg)
+
+无序（unordered）容器的主要优点是，当你打算查找一个带某特定值的元素，其速度甚至可能快过关联式容器。
+
+事实上无序容器提供的是摊提的常量复杂度（amortized constant complexity），前提是你有一个良好的hash函数。
+
+然而提供一个良好的hash函数并非易事（见7.9.2节第363页），你可能需要提供许多内存作为bucket。
+
+根据关联式容器的分类法，STL定义出下面这些无序容器：
+
+- Unordered set是无序元素的集合，其中每个元素只可出现一次。也就是不允许元素重复。
+- Unordered multiset 和 unordered set 的唯一差别是它允许元素重复。也就是 unordered multiset可能内含多个有着相同value的元素。
+- Unordered map的元素都是key/value pair。每个key只可出现一次，不允许重复。它也可以用作关联式数组（associative array），那是“索引可为任意类型”的array
+- Unordered multimap和unordered map的唯一差别是允许重复。也就是unordered mul-timap可能内含多个“拥有相同key”的元素。它可以用作字典（dictionary）
+
+所有这些无序容器的class都有若干可有可无的template实参，用来指明hash函数和等效准则，该准则被用来寻找某给定值，以便判断是否发生重复。默认的等效准则是操作符==。
+
+你可以把unordered set视为一种特殊的unordered map，只不过其元素的value等同于key。现实中所有无序容器通常都使用hash table作为底层实现。
+
+#### 示例
+
+### 关联式数组
+不论map或unordered map，都是key/value pair形成的集合，每个元素带着独一无二的key。
+
+如此的集合也可被视为一个关联式数组（associative array），也就是“索引并非整数”的array。也因此，刚才说的那两个容器都提供了下标操作符[]。
+
+考虑下面这个例子：
+
+#include <unordered_map>
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    unordered_map<string, int> m;
+
+    m["aa"] = 1;
+    m["bb"] = 2;
+    m["cc"];
+    m["dd"] = 4;
+
+    m["aa"] += 3;
+
+    cout << m["aa"] + m["cc"] << endl;
+
+    // 使用 at 访问不存在的元素，触发异常 out_of_range
+    m.at("ee");
+
+    return 0;
+}
+
+### 其他容器
+#### String
+你可以把string当作一种STL容器。String很类似vector，但其元素都是字符
+
+#### 寻常的C-Style Array
+
+C++程序不再需要直接使用C-style array。Vector和array提供了寻常C-style array的所有特性，并具备更安全更方便的接口。
+
+#### 用户自定义容器
+
+现实中你可以给予任何“与容器相仿（container-like）的对象”一个相应的STL接口，使它得以迭代元素，或提供标准操作以运用元素内容。
+
+例如你可以引入一个class用以表现目录（directory），而你能够迭代其中各文件，视它们为元素并操纵运用它们。
+
+#### 容器适配器
+
+除了以上数个根本的容器类，为满足特殊需求，C++标准库还提供了一些所谓的容器适配器，它们也是预定义的容器，提供的是一定限度的接口，用以应付特殊需求。
+
+这些容器适配器都是根据基本容器实现而成，包括：
+
+Stack 名字足以说明一切。Stack容器对元素采取LIFO（后进先出）管理策略。
+
+Queue 对元素采取 FIFO （先进先出）管理策略。也就是说，它是个寻常的缓冲区（buffer）。
+
+Priority queue 其内的元素拥有各种优先权。所谓优先权乃是基于程序员提供的排序准则（默认为操作符＜）而定义。
+这种特殊容器的效果相当于这样一个缓冲区：“下一元素永远是容器中优先权最高的元素”。如果同时有多个元素具备最高优先权，则其次序无明确定义。
+
+## 迭代器
+迭代器是一个“可遍历STL容器全部或部分元素”的对象。迭代器用来表现容器中的某一个位置。基本操作如下：
+
+- Operator＊返回当前位置上的元素值。如果该元素拥有成员，你可以通过迭代器直接以操作符-＞取用它们。
+- Operator++令迭代器前进至下一元素。大多数迭代器还可使用operator--退至前一元素。
+- Operators==和！=判断两个迭代器是否指向同一位置。
+- Operator=对迭代器赋值（也就是指明迭代器所指向的元素的位置）。
+
+迭代器是所谓的smart pointer，具有遍历复杂数据结构的能力，其内部运作机制取决于其所遍历的数据结构。
+
+因此，每一种容器都必须提供自己的迭代器。事实上每一种容器的确都将其迭代器以嵌套（nested）方式定义于class内部。因此各种迭代器的接口虽然相同，类型却各自不同。
+
+这直接引出了泛型程序设计的概念：所有操作都使用相同接口，纵使类型不同。因此，你可以使用template将泛型操作公式化，使之得以顺利运作那些“能够满足接口需求”的任何类型。
+
+所有容器类都提供一些基本的成员函数，使我们得以取得迭代器并以之遍历所有元素。这些函数中最重要的是：
+- begin（）返回一个迭代器，指向容器起点，也就是第一元素（如果有的话）的位置。
+- end（）返回一个迭代器，指向容器终点。终点位于最末元素的下一位置，这样的迭代器又称作“逾尾（past-the-end）”迭代器。
+
+### Range-Based for循环vs.迭代器
+
+for (elem : coll) {
+    ...
+}
+
+被解释为
+
+for (auto pos = coll.begin() , end = coll.end(); pos != end; ++pos) {
+    elem = *pos;
+    ...
+}
+
+除了基本操作，迭代器还有其他能力。这些能力取决于容器的内部结构。STL总是只提供效率比较出色的操作，因此如果容器允许随机访问（例如vector或deque），它们的迭代器也必定能进行随机操作（例如直接让迭代器指向第5元素）。
+
+根据能力的不同，迭代器被划分为五种不同类别。STL预先定义好的所有容器，其迭代器均属于以下三种分类：
+
+1. 前向迭代器（Forward iterator） 只能够以累加操作符（increment operator）向前迭代。Class forward_list的迭代器就属此类。
+
+其他容器如unordered_set、unordered_multiset、unordered_map和unordered_multimap也都至少是此类别（但标准库其实为它们提供的是双向迭代器〔forward iterator〕
+
+2. 双向迭代器（Bidirectional iterator） 顾名思义它可以双向行进：以递增（increment）运算前进或以递减（decrement）运算后退。
+
+list、set、multiset、map和multimap提供的迭代器都属此类。
+
+3. 随机访问迭代器（Random-access iterator） 它不但具备双向迭代器的所有属性，还具备随机访问能力。
+
+更明确地说，它们提供了迭代器算术运算的必要操作符（和寻常指针的算术运算完全对应）。
+
+你可以对迭代器增加或减少一个偏移量、计算两迭代器间的距离，或使用 ＜和 ＞之类的relational（相对关系）操作符进行比较。
+
+vector、deque、array和string提供的迭代器都属此类。
+
+除此之外，STL还定义了两个类别：
+
+· 输入型迭代器（Input iterator）向前迭代时能够读取/处理value。Input stream迭代器就是这样一个例子
+
+· 输出型迭代器（Output iterator）向前迭代时能够涂写value。Inserter和output stream迭代器都属此类。
+
+## 算法
+为了处理容器内的元素，STL提供了一些标准算法，包括查找、排序、拷贝、重新排序、修改、数值运算等基本而普遍的算法。
+
+算法并非容器类的成员函数，而是一种搭配迭代器使用的全局函数。
+
+在面向对象编程（OOP）概念里，数据与操作合为一体，在这里则被明确划分开来，再通过特定的接口彼此互动。
+
+当然这需要付出代价：首先是用法有失直观，其次某些数据结构和算法之间并不兼容。更有甚者，某些容器和算法虽然勉强兼容却毫无用处（也许导致很糟的效率）。
+
+因此，深入学习STL概念并了解其缺陷，显得十分重要，唯其如此方能取其利而避其害。
+
+#include <algorithm>
+#include <vector>
+#include <iostream>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    vector<int> coll = {2, 4, 5, 1, 5};
+
+    vector<int>::iterator minpos = min_element(coll.begin(), coll.end());
+    auto maxpos = max_element(coll.begin(), coll.end());
+
+    cout << "min : " << *minpos << endl;
+    cout << "max : " << *maxpos << endl;
+
+    sort(coll.begin(), coll.end());
+
+    auto pos4 = find(coll.begin(), coll.end(), 4);
+
+    reverse(pos4, coll.end());
+
+    for (auto & elem  : coll ) {
+        cout << elem << " ";
+    }
+    cout << endl;
+
+    return 0;
+}
+
+### 区间
+所有算法都是用来处理一或多个区间内的元素。这样的区间可以（但非必须）涵盖容器内的全部元素。
+
+为了操作容器元素的某个子集，我们必须将区间首尾当作两个实参（argument）传给算法，而不是一口气把整个容器传递进去。
+
+这样的接口灵活又危险。调用者必须确保经由两实参定义出来的区间是有效的（valid）。
+
+所谓有效就是，从起点出发，逐一前进，能够到达终点。
+
+也就是说，程序员自己必须确保两个迭代器隶属同一容器，而且前后的放置是正确的，否则结果难料，可能引起无穷循环，也可能访问到内存禁区。
+
+就此而言，迭代器就像寻常指针一样危险。不过请注意，所谓“结果难料”（或说行为不明确〔undefined behavior〕）意味着任何STL实现均可自由选择合适的方式来处理此类错误。
+
+稍后你会发现，确保区间有效并不像听起来那么简单。
+
+所有算法处理的都是半开区间（half-open range）——包括起始元素的位置但不包括末尾元素的位置。
+
+#include <algorithm>
+#include <list>
+#include <iostream>
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    list<int> coll;
+
+    for (auto i = 20; i < 40; ++i) {
+        coll.push_back(i);
+    }
+
+    // 没有3 ， 返回 coll.end()
+    auto pos3 = find(coll.begin(), coll.end(), 3);
+
+    // 因为 pos3 为 coll.end()
+    // 所以 reverse 的区间为空，不进行翻转
+    reverse(pos3, coll.end());
+
+    auto pos25 = find(coll.begin(), coll.end(), 25);
+    auto pos35 = find(coll.begin(), coll.end(), 35);
+
+    cout << "max : " << *max_element(pos25, pos35) << endl;
+
+    // 因为 pos 不是随机迭代器，所以不支持 pos35 + 1, 只能用 ++pos35
+    cout << "min : " << *min_element(pos25, ++pos35) << endl;
+
+    return 0;
+}
+
+本节的所有例子都可以正常运作的前提是，你知道pos25在pos35之前。否则[pos25，pos35）就不是个有效区间。
+
+现在假设你并不知道元素25和元素35的前后关系，甚至连它们是否存在也心存疑虑。如果你手上是随机访问迭代器（random-access iterator），你可以使用operator＜进行检查：
+
+如果你手上并非随机访问迭代器，那还真没什么直截了当的办法可以确定哪个迭代器在前。你只能在“起点和某个迭代器”之间，以及“该迭代器和终点”之间，寻找另外那个迭代器。
+
+不是一口气在整个区间中查找两值，而是试着了解，哪个值先来到。例如：
+
+    // 25 35
+    pos25 = find(coll.begin(), coll.end(), 25);
+    pos35 = find(pos25, coll.end(), 35);
+    if (pos25 != coll.end() && pos35 != coll.end()) {
+
+        cout << "max : " << *max_element(pos25, pos35) << endl;
+        cout << "min : " << *min_element(pos25, pos35) << endl;
+    }
+    else {
+        // 35 25
+        pos35 = find(coll.begin(), pos25, 35);
+
+        cout << "max : " << *max_element(pos35, pos25) << endl;
+        cout << "min : " << *min_element(pos35, pos25) << endl;
+    }
+
+更好的写法
+
+    auto pos = find_if(coll.begin(), coll.end(),
+            [](int i) {
+                return i == 25 || i == 35;
+            });
+    if (pos == coll.end()) {
+        cout << "25 和 35 不存在";
+    }
+    else if (*pos == 25) {
+        pos25 = pos;
+        pos35 = find(++pos, coll.end(), 35);
+
+        cout << "max : " << *max_element(pos25, pos35) << endl;
+        cout << "min : " << *min_element(pos25, pos35) << endl;
+    }
+    else if (*pos == 35) {
+        pos35 = pos;
+        pos25 = find(++pos, coll.end(), 25);
+        cout << "max : " << *max_element(pos35, pos25) << endl;
+        cout << "min : " << *min_element(pos35, pos25) << endl;
+    }
+
+
+### 多重区间
+有数个算法可以（或说需要）同时处理多重区间。
+
+通常你必须设定第一个区间的起点和终点，至于其他区间，只需设定起点即可，终点通常可由第一区间的元素数量推导出来。
+
+例如以下程序片段中，equal（）从头开始逐一比较coll1和coll2的所有元素：
+
+    if (equal(coll1.begin(), coll1.end(),   // first range
+                coll2.begin())) {           // second range
+        ..
+    }
+
+于是，coll2之中参与比较的元素数量，间接取决于coll1内的元素数量
+
+这使我们收获一个重要心得：如果某个算法用来处理多重区间，那么当你调用它时，务必确保第二（以及其他）区间所拥有的元素个数至少和第一区间内的元素个数相同。
+
+特别是执行涂写动作时，务必确保目标区间（destination range）够大。
+
+下面这段程序会立即报错， 
+
+    vector<int> coll1 = {1, 2, 3, 4};
+    vector<int> coll2;
+
+    copy(coll1.begin(), coll1.end(), coll2.begin());
+
+vector虽然是动态数组，然而由于该算法执行的是覆写动作（overwrite）而非安插动作（insert），
+
+所以目标区间必须拥有足够的元素被覆写, 意味着你会覆写coll2.end（）之后的任何东西
+
+想要避免上述错误, 你可以
+
+（1）确认目标区间内有足够的元素空间，
+
+    coll2.resize(coll1.size());
+
+或是
+
+（2）采用insert iterator。Insert iterator
+
+
+## 迭代器适配器
+迭代器（Iterator）是一个纯抽象概念：任何东西，只要其行为类似迭代器，它就是一个迭代器。
+
+因此，你可以撰写一些类（class）具备迭代器接口，但有着各不相同的行为。
+
+C++标准库提供了数个预定义的特殊迭代器，亦即所谓迭代器适配器（iterator adapter）。它们不仅是辅助性质而已，它们赋予整个迭代器抽象概念更强大的威力。
+
+以下数小节简介下面各种迭代器适配器（iterator adapter）：
+
+1.Insert iterator（安插型迭代器）
+
+2.Stream iterator（串流迭代器）
+
+3.Reverse iterator（逆向迭代器）
+
+4.Move iterator（搬移迭代器）
+
+### Insert Iterator
+它可以使算法以安插（insert）方式而非覆写（overwrite）方式运作。使用它可以解决算法的“目标空间不足”问题。
+
+Insert iterator内部将接口做了新的定义：
+
+- 如果你对某个元素赋值（assign），会引发“对其所属集合的安插（insert）动作”。至于插入位置是在容器的最前或最后，或某特定位置上，要视三种不同的insert iterator而定。
+- 单步前进（step forward）不会造成任何动静（是个no-op）。
+
+#include <algorithm>
+#include <deque>
+#include <iterator>
+#include <list>
+#include <set>
+#include <vector>
+using namespace std;
+
+int main (int argc, char *argv[]) {
+
+    list<int> coll1 = {1, 2, 3 ,4, 5};
+
+    vector<int> coll2;
+    copy(coll1.begin(), coll1.end(), back_inserter(coll2));
+
+    deque<int> coll3;
+    copy(coll1.begin(), coll1.end(), front_inserter(coll3));
+
+    set<int> coll4;
+    copy(coll1.begin(), coll1.end(), inserter(coll4, coll4.begin()));
+
+    return 0;
+}
+
+1. Back inserter （安插于容器最末端） 其内部调用 push_back（），在容器末端插入元素
+
+2. Front inserter（安插于容器最前端）其内部调用push_front（），将元素安插于容器最前端
+
+Front inserter只能用于提供有push_front（）的容器，在C++标准库中这样的容器是deque、list和forward_list。
+
+3. General inserter这种一般性的inserter，简称inserter，它的作用是在“初始化时接受之第二实参”所指位置的前方插入元素。
+
+它内部调用成员函数insert（），并以新值和新位置作为实参传入。所有STL容器都提供insert（）成员函数
+
+![](./pic/15.jpg)
+
+###  Stream Iterator（串流迭代器）
+
+Stream iterator被用来读/写stream。
+
+它们提供了必要的抽象性，使得来自键盘的输入像是个集合（collection），你能够从中读取内容。
+
+同样道理，你也可以把一个算法的输出结果重新导向到某个文件或屏幕上。
+
+#include <algorithm>
+#include <string>
+#include <iostream>
+#include <iterator>
+#include <vector>
+using namespace std;
+
+int main (int argc, char *argv[]) {
+
+    vector<string> coll;
+
+    copy(istream_iterator<string>(cin),
+            istream_iterator<string>(),
+            back_inserter(coll));
+
+    sort(coll.begin(), coll.end());
+
+    // unique_copy 不复制相邻的重复项
+    unique_copy(coll.cbegin(), coll.cend(),
+            ostream_iterator<string>(cout, "\n"));
+
+    return 0;
+}
+
+    istream_iterator<string>(cin);
+
+会产生一个可从“标准输入串流（standard input stream） cin”读取数据的stream iterator。
+
+其中的template实参string表示这个stream iterator专司读取该种类型的元素。
+
+这些元素通过一般的`operator>>`被读取进来。因此每当算法企图处理下一元素时，istream iterator就会将这种企图转化为以下行动：
+
+    cin >> string
+
+针对string而执行的input操作符通常读取以空白分隔的文字
+
+    istream_iterator<string>();
+
+会调用istream iterator的default构造函数，产生一个代表“串流结束符”（end-of-stream）的迭代器，这个东西代表的意义是：你不能再从中读取任何东西。
+
+    ostream_iterator<string>(cout, "\n");
+
+会产生一个output stream iterator，通过`operator<<`向cout写入string。
+
+cout之后的第二实参（可有可无）被用作元素之间的分隔符。本例指定为一个换行符，因此每个元素都被打印于独立的一行。
+
+### Reverse Iterator（反向迭代器）
+
+Reverse iterator会造成算法逆向操作，其内部将对increment（递增）操作符的调用转换为对decrement（递减）操作符的调用，反之亦然。
+
+所有提供双向（bidirectional）或随机访问（random-access）迭代器的容器（也就是forward_list之外的所有序列式容器和所有关联式容器）
+
+都可以通过它们的成员函数rbegin()和rend() 产生一个反向迭代器。
+
+forward_list 和所有无序容器都没有提供回向迭代（backward-iteration）接口，即rbegin（）、rend（）等等。
+
+原因是那些容器内部实现只是使用singly linked list串起所有元素。
+
+###  Move Iterator（搬移迭代器）
+
+这种迭代器始自C++11，用来将任何“对低层元素（underlying element）的访问”转换为一个move操作。
+
+也就是说，它们允许从一个容器移动元素至另一个容器，不论是在构造函数内或是在运用算法时。
+
+## 用户自定义的泛型函数
+
+
+##  更易型算法（Manipulating Algorithm）
+
+### 移除（Removing）元素
+
+算法remove（）自某个区间删除元素。然而如果你用它来删除容器内的所有元素，其行为肯定会让你吃惊。例如：
+
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <list>
+using namespace std;
+
+int main (int argc, char *argv[]) {
+
+    list<int> coll;
+
+    for (int i = 1; i < 6; ++i) {
+        coll.push_back(i);
+        coll.push_front(i);
+    }
+
+    cout << "pre :\t";
+    copy(coll.begin(), coll.end(),
+            ostream_iterator<int>(cout, ", "));
+    cout << endl;
+
+    std::remove(coll.begin(), coll.end(), 3);
+
+    cout << "post :\t";
+    copy(coll.begin(), coll.end(),
+            ostream_iterator<int>(cout, ", "));
+    cout << endl;
+
+    return 0;
+}
+
+输出
+pre :   5, 4, 3, 2, 1, 1, 2, 3, 4, 5,
+post :  5, 4, 2, 1, 1, 2, 4, 5, 4, 5,
+
+元素的次序改变了，有些元素被删除了。数值为 3的元素被其后的元素覆盖了。至于集合尾端那些未被覆盖的元素，原封不动
+
+![](./pic/16.jpg)
+
+这个算法返回了一个新终点。你可以利用该终点获得新区间、缩减后的容器大小，或是获得被删除元素的个数
+
+    auto end = std::remove(coll.begin(), coll.end(), 3);
+    coll.erase(end, coll.end());  // 使用 list<int>::erase 而非 全局 erase
+
+
+更简洁的写法
+
+    coll.erase(remove(coll.begin(), coll.end(), 3), coll.end());
+
+为何算法不自己调用erase（）呢？
+
+这个问题正好点出STL为获取弹性而付出的代价。
+
+通过“以迭代器为接口”，STL将数据结构和算法分离开来。
+
+然而迭代器只不过是“容器内部某一位置”的抽象概念而已。
+
+一般说来，迭代器对自己所属的容器一无所知。任何“以迭代器访问容器”的算法，都不得（无法）通过迭代器调用容器类所提供的任何成员函数。
+
+这个设计导致一个重要结果：算法的操作对象不一定得是“容器内的全部元素”所形成的区间，而可以是那些元素的子集。
+
+甚至算法可作用于一个“并未提供成员函数erase（）”的容器身上（array就是个例子）。所以，为了达成算法的最大弹性，不强求“迭代器必须了解其容器细节”还是很有道理的。
+
+注意，通常并无必要删除那些“已被移除”的元素。以逻辑终点取代容器的实际终点，通常就足以应对现实情况。你可以拿这个逻辑终点搭配任何算法演出。
+
+### 更易Associative（关联式）和Unordered（无序）容器
 
 
