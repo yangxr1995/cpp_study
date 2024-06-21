@@ -1379,3 +1379,190 @@ distance(first, last) = 3
 distance(last, first) = -3
 ```
 
+# bind
+(1)
+template< class F, class... Args >
+/* unspecified */ bind( F&& f, Args&&... args );
+template< class F, class... Args >
+constexpr /* unspecified */ bind( F&& f, Args&&... args );
+
+(2)	
+template< class R, class F, class... Args >
+/* unspecified */ bind( F&& f, Args&&... args );
+template< class R, class F, class... Args >
+constexpr /* unspecified */ bind( F&& f, Args&&... args );
+
+The function template std::bind generates a forwarding call wrapper for f. 
+
+函数模板bind 为 f 生成一个转发调用包装器，
+
+Calling this wrapper is equivalent to invoking f with some of its arguments bound to args.
+
+调用这个包装器相当于调用 使用一些参数绑定到 f 后调用 f
+
+## Parameters
+f : Callable object (function object, pointer to function, reference to function, pointer to member function, or pointer to data member) that will be bound to some arguments
+
+f 可调用的对象（函数对象，函数指针，函数引用，成员函数指针，成员数据指针）会被绑定一些参数
+
+args : list of arguments to bind, with the unbound arguments replaced by the placeholders _1, _2, _3... of namespace std::placeholders
+
+一系列参数用于绑定，使用占位符替换不绑定参数
+
+## Return value
+A function object g of unspecified type T, for which std::is_bind_expression<T>::value is true. It has the following members:
+
+未指定类型的函数对象 g , 有下列成员
+
+Member function operator()
+When g is invoked in a function call expression g(u1, u2, ... uM), an invocation of the stored object takes place, as if by
+
+当使用表达式 g(u1, u2, ... uM) 会调用 g 的 operator() , 并使用存储的对象替换位置, 过程类似于
+
+1) INVOKE(fd, std::forward<V1>(v1), std::forward<V2>(v2), ..., std::forward<VN>(vN)), or
+2) INVOKE<R>(fd, std::forward<V1>(v1), std::forward<V2>(v2), ..., std::forward<VN>(vN)),
+
+where fd is a value of type std::decay<F>::type, the values and types of the bound arguments v1, v2, ..., vN are determined as specified below.
+
+fd 是类型为 decay<F>::type 的值，绑定参数 v1, v2 .. 的类型和值按照下面方式确定 ：
+
+If some of the arguments that are supplied in the call to g() are not matched by any placeholders stored in g, the unused arguments are evaluated and discarded.
+
+如果一些实参没有被匹配到 存储在 g 中的占位符 ， 这些没有使用的参数将被计算和丢弃
+
+### Bound arguments
+
+For each stored argument arg_i, the corresponding bound argument v_i in the INVOKE or INVOKE<R> operation is determined as follows:
+
+被存储的参数称为 arg_i,  : bind(f, arg_1, arg_2, ..)
+
+在内部调用的参数称为 v_i : f(v_1, v_2 ...)
+
+g(u1, u2, u3 ..) 被调用时，参数为 u1, u2 ...
+
+Case 1: reference wrappers
+If arg_i is of type std::reference_wrapper<T> (for example, std::ref or std::cref was used in the initial call to std::bind), 
+
+如果存储的类型是 reference_wrapper，如在调用 bind时使用 std::ref
+
+then v_i is arg_i.get() and its type V_i is T&: the stored argument is passed by reference into the invoked function object.
+
+那么 v_i 等于 arg_i.get() , 并且 v_i 的类型是 T& , 那么存储参数将作为外部某对象的引用，传递到函数对象
+
+Case 2: bind expressions
+If arg_i is of type T for which std::is_bind_expression<T>::value is true (for example, another std::bind expression was passed directly into the initial call to std::bind), 
+
+如果存储的是表达式 is_bind_expression<T>，比如使用子bind 做实参调用 bind.
+
+then std::bind performs function composition: instead of passing the function object that the bind subexpression would return, 
+
+那么bind执行函数组合：不传递bind子表达式返回的结果，
+
+the subexpression is invoked eagerly, and its return value is passed to the outer invokable object. 
+
+而是将子表达式本身传递，并在之后被执行后，将返回值传递给外层可调用对象
+
+If the bind subexpression has any placeholder arguments, they are shared with the outer bind (picked out of u1, u2, ...). 
+
+如果bind子表达式有任何占位符参数，他们会共享外部bind的占位符, 从 u1, u2 获得值
+
+Case 3: placeholders
+If arg_i is of type T, for which std::is_placeholder<T>::value is not 0 (meaning, a placeholder such as std::placeholders::_1, _2, _3, ... was 
+
+如果 arg_i 是占位符，如 _1, _2 
+
+used as the argument to the initial call to std::bind), then the argument indicated by the placeholder (u1 for _1, u2 for _2, etc) 
+
+那么 u1 u2 通过占位符表示 u1 为 _1 , u2 为 _2
+
+Case 4: ordinary arguments
+Otherwise, arg_i is passed to the invokable object as lvalue argument: v_i is simply arg_i and its type V_i is T cv ﻿&, where cv is the same cv-qualification as that of g.
+
+否则，arg_i 作为左值参数传递给可调用对象：v_i 就是简单的 arg_i，其类型 V_i 是 T cv &，其中 cv 与 g 的cv 限定一样。
+
+### 示例
+
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <random>
+ 
+void f(int n1, int n2, int n3, const int& n4, int n5)
+{
+    std::cout << n1 << ' ' << n2 << ' ' << n3 << ' ' << n4 << ' ' << n5 << '\n';
+}
+ 
+int g(int n1)
+{
+    return n1;
+}
+ 
+struct Foo
+{
+    void print_sum(int n1, int n2)
+    {
+        std::cout << n1 + n2 << '\n';
+    }
+ 
+    int data = 10;
+};
+ 
+int main()
+{
+    using namespace std::placeholders;  // for _1, _2, _3...
+ 
+    std::cout << "1) argument reordering and pass-by-reference: ";
+    int n = 7;
+    // (_1 and _2 are from std::placeholders, and represent future
+    // arguments that will be passed to f1)
+    auto f1 = std::bind(f, _2, 42, _1, std::cref(n), n);
+    n = 10;
+    f1(1, 2, 1001); // 1 is bound by _1, 2 is bound by _2, 1001 is unused
+                    // makes a call to f(2, 42, 1, n, 7)
+ 
+    std::cout << "2) achieving the same effect using a lambda: ";
+    n = 7;
+    auto lambda = [&ncref = n, n](auto a, auto b, auto /*unused*/)
+    {
+        f(b, 42, a, ncref, n);
+    };
+    n = 10;
+    lambda(1, 2, 1001); // same as a call to f1(1, 2, 1001)
+ 
+    std::cout << "3) nested(嵌套) bind subexpressions share the placeholders: ";
+    auto f2 = std::bind(f, _3, std::bind(g, _3), _3, 4, 5);
+    f2(10, 11, 12); // makes a call to f(12, g(12), 12, 4, 5);
+ 
+    std::cout << "4) bind a RNG with a distribution: ";
+    std::default_random_engine e;
+    std::uniform_int_distribution<> d(0, 10);
+    auto rnd = std::bind(d, e); // a copy of e is stored in rnd
+    for (int n = 0; n < 10; ++n)
+        std::cout << rnd() << ' ';
+    std::cout << '\n';
+ 
+    std::cout << "5) bind to a pointer to member function: ";
+    Foo foo;
+    auto f3 = std::bind(&Foo::print_sum, &foo, 95, _1); // 成员函数，需要传递 this
+    f3(5);
+ 
+    std::cout << "6) bind to a mem_fn that is a pointer to member function: ";
+    auto ptr_to_print_sum = std::mem_fn(&Foo::print_sum);
+    auto f4 = std::bind(ptr_to_print_sum, &foo, 95, _1);
+    f4(5);
+ 
+    std::cout << "7) bind to a pointer to data member: ";
+    auto f5 = std::bind(&Foo::data, _1);
+    std::cout << f5(foo) << '\n';
+ 
+    std::cout << "8) bind to a mem_fn that is a pointer to data member: ";
+    auto ptr_to_data = std::mem_fn(&Foo::data);
+    auto f6 = std::bind(ptr_to_data, _1);
+    std::cout << f6(foo) << '\n';
+ 
+    std::cout << "9) use smart pointers to call members of the referenced objects: ";
+    std::cout << f6(std::make_shared<Foo>(foo)) << ' '
+              << f6(std::make_unique<Foo>(foo)) << '\n';
+}
+
+

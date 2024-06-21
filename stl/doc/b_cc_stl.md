@@ -2486,4 +2486,224 @@ post :  5, 4, 2, 1, 1, 2, 4, 5, 4, 5,
 
 ### 更易Associative（关联式）和Unordered（无序）容器
 
+更易型算法（指那些会移除〔remove〕、重排〔reorder〕、修改〔modify〕元素的算法）若用于关联式容器或无序容器，会出问题。
+关联式和无序容器不能被当作操作目标，原因很简单：如果更易型算法用于关联式和无序容器身上，会改变某位置上的值，进而破坏容器本身对次序的维护
+
+现在问题来了，如何从关联容器和无序容器中删除元素？好吧，很简单：调用它们的成员函数！每一种关联式容器和无序容器都提供
+
+#include <set>
+#include <iostream>
+#include <algorithm>
+#include <iterator>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    set<int> coll = {3, 5 ,1 ,4 ,2};
+
+    copy(coll.begin(), coll.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    // 目标元素不存在，返回0 nullptr
+    // 存在返回被删除元素
+    int num = coll.erase(3);
+
+    cout << "remove num " << num << endl;
+
+    copy(coll.begin(), coll.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    return 0;
+}
+
+###  算法vs.成员函数
+就算我们符合种种条件，得以使用某个算法，那也未必就一定是好。容器本身可能提供功能相似而效能更佳的成员函数。
+
+如果高效能是你的首要目标，你应该总是优先选用成员函数。
+
+问题是你必须先知道，某个容器确实存在效能明显突出的成员函数。面对list却使用remove（）算法，决不会收到任何警告信息或报错通知。
+
+然而如果你决定使用成员函数，一旦换用另一种容器，就不得不更改代码
+
+#include <algorithm>
+#include <list>
+#include <iterator>
+#include <iostream>
+ 
+int main()
+{
+    std::list<int> l = {1, 100, 2, 3, 10, 1, 11, -1, 12};
+ 
+    l.remove(1);
+    l.remove_if([](int n){ return n > 10; });
+ 
+    std::cout << "Finally, the list contains: ";
+    std::copy(l.begin(), l.end(), std::ostream_iterator<int>(std::cout, ", "));
+    std::cout << '\n';
+}
+
+## 以函数作为算法的实参
+
+有些算法可以接受用户自定义的辅助性函数，借以提高弹性和能力。这些函数将被算法内部调用。
+
+## 函数对象（Function Object）
+
+传递给算法的“函数型实参”（functional argument）不一定得是函数，可以是行为类似函数的对象。这种对象称为函数对象（function object），或称为仿函数（functor）
+
+函数对象相对于回调函数带来更复杂的代码，然而函数对象有其过人之处，比起寻常函数，它们有以下优点：
+
+1. 函数对象是一种带状态（with state）的函数。“行为像 pointer”的对象我们称之为“smart pointer”，同样道理，“行为像function”的对象我们可以称之为“smart function”，
+
+因为它们的能力超越了operator （）。函数对象可拥有成员函数和成员变量，这意味着函数对象拥有状态（state）。
+
+事实上，在同一时间点，相同类型的两个不同的函数对象所表述的相同机能（same functionality），可具备不同的状态。
+
+这在寻常函数中是不可能的。另一个好处是，你可以在运行期初始化它们——当然必须在它们被使用（被调用）之前。
+
+2. 每个函数对象有其自己的类型。寻常函数，唯有在其签名式（signature）不同时，才算类型不同。
+
+而函数对象即使签名式相同，也可以有不同的类型。事实上由函数对象定义的每一个函数行为都有其自己的类型。
+
+这对于“运用template实现泛型编程”乃是一个卓越的贡献，因为这么一来我们便可以将函数行为当作template参数来运用。
+
+这使得不同类型的容器可以使用同类型的函数对象作为排序准则。也可确保你不会在“排序准则不同”的集合（collection）间赋值、合并或比较。
+
+你甚至可以设计函数对象的继承体系，以此完成某些特别事情，例如在一个总体原则下确立某些特殊情况。
+
+3. 函数对象通常比寻常函数速度快。就template概念而言，由于更多细节在编译期就已确定，所以通常可能进行更好的优化。
+
+所以，传入一个函数对象（而非寻常函数）可能获得更好的执行效能。
+
+### Binder
+
+使用特殊的function adapter（函数适配器），或所谓binder，将预定义的函数对象和其他数值结合为一体。
+
+#include <algorithm>
+#include <deque>
+#include <functional>
+#include <set>
+#include <iterator>
+#include <iostream>
+
+using namespace std;
+using namespace std::placeholders;
+
+template <typename T>
+void print_elemt(T &coll, const char *str)
+{
+    cout << str;
+    for (auto elem : coll) {
+        cout << elem << " ";
+    }
+    cout << endl;
+}
+ 
+int main (int argc, char *argv[]) {
+    
+    set<int, greater<int>> coll1 = {1, 2, 3, 4, 5};
+    deque<int> coll2;
+
+    print_elemt(coll1, "coll1 = ");
+
+    transform(coll1.begin(), coll1.end(),
+            back_inserter(coll2),
+            bind(multiplies<int>(), _1, 10));
+
+    print_elemt(coll2, "coll2 = ");
+
+    replace_if(coll2.begin(), coll2.end(),
+            bind(equal_to<int>(), _1, 10),
+            40);
+
+    print_elemt(coll2, "coll2 = ");
+
+    coll2.erase(remove_if(coll2.begin(), coll2.end(),
+                bind(logical_and<int>(), 
+                    bind(greater_equal<int>(), _1, 20),
+                    bind(less_equal<int>(), _1, 30)
+                )));
+
+    print_elemt(coll2, "coll2 = ");
+
+    return 0;
+}
+
+## 容器内的元素
+
+容器内的元素必须符合某些条件，因为容器乃是以一种特别方式来操作它们。
+
+###  容器元素的必要条件
+
+STL的容器、迭代器、算法都是template，因此它们可以操作任何类型，都可以。
+
+然而，由于某些加诸元素身上的操作，导致出现某些条件。STL容器元素必须满足以下三个基本要求：
+
+1.元素必须可复制或可搬移（copyable or movable）。也就是说，元素类型必须隐式或显式提供一个copy或move构造函数。
+
+2.元素必须可被assignment操作符加以搬移或赋值。容器和算法以新元素覆写旧元素时用的是assignment操作符。
+
+3.元素必须可被一个析构函数销毁。当元素被移除（remove），容器会销毁该元素的内部拷贝。因此，析构函数一定不能是private。
+
+此外，一如C++惯常的做法，析构函数一定不可抛出异常，否则世事难料。
+
+这三个条件对任何class而言其实都是隐含成立的。如果某个class既没有为上述动作定义特殊版本，也没有定义任何特殊成员破坏这些动作的健全性，那么它自然而然也就满足了上述条件。
+
+下面的条件也应当获得满足：
+
+· 对序列式容器而言，元素的default构造函数必须可用。我们可以在没有给予任何初值的情况下创建一个非空容器，或增加容器的元素个数。这些元素都将以default构造函数完成，不需任何实参。
+
+· 对于某些操作，必须定义操作符==以执行相等测试。如果你想查找元素，这一点特别重要。
+
+· 在关联式容器中，元素必须定义出适用于排序准则的操作。默认情况下是操作符＜，它将被函数对象less＜＞调用。
+
+· 无序容器应该为元素提供一个hash函数，和一个等同时测试准则（equivalence criterion）。
+
+### Value语义vs.Reference语义
+
+通常，所有容器都会建立元素拷贝（copy），返回的也是元素拷贝。这意味着容器内的元素与你放进去的东西相等（equal）但非同一（identical）。
+
+如果你修改容器的元素，实际上改变的是拷贝而不是原件。
+
+Value 被复制意味着 STL 容器所提供的是 value 语义。它们容纳的是你安插的对象值，而不是对象本身。
+
+然而现实中你也许需要用到 reference 语义，让容器容纳元素的reference。
+
+STL只支持value语义，不支持reference语义。这当然是利弊参半。好处是：
+
+· 复制元素很简单。
+
+· 使用reference时容易导致错误。你必须确保reference所指对象仍然健在，并须小心对付偶尔出现的环式指向（circular reference）状态。
+
+缺点是：
+
+· 复制元素可能会导致不良的效率；有时甚至无法复制。
+
+· 无法在数个不同的容器中管理同一份对象。
+
+现实中你同时需要两种做法。你不但需要一份独立（于原先对象）的拷贝（此乃value语义），也需要一份代表原数据、但能相应改变原值的拷贝（此乃reference语义）。
+
+不幸的是，C++标准库不支持reference语义。不过我们可以利用value语义实现reference语义。
+
+一个显而易见的方法是以pointer作为元素。然而寻常的pointer有些常见问题，例如它们指向的对象也许不复存在，pointer之间的“比较”行为也未必如你预期，
+
+因为实际比较的是pointer而非其所指对象。所以使用寻常pointer作为容器元素，必须非常谨慎。
+
+好一点的办法是使用某种smart pointer，那是一种对象，有着类似pointer的接口，但内部做了一些额外检查和处理。
+
+事实上自TR1起，C++标准库提供了class shared_ptr，这是个“可以共享相同对象”的smart pointer。
+
+此外，你可以使用class std：：reference_wrapper＜＞让STL容器持有reference。
+
+## STL内部的错误和异常
+
+### 错误处理
+
+STL的设计宗旨是效能优先，安全次之
+
+误用STL的方法有百千种，STL没有义务预防你的各种可能不慎。因此，在软件开发阶段使用“安全版本”的STL是个好主意。
+
+第一个STL安全版本由Cay Horstmann开发（见[SafeSTL]），另一个例子是STLport
+
+# STL容器
+
 
