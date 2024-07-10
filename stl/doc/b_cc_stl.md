@@ -2706,4 +2706,116 @@ STL的设计宗旨是效能优先，安全次之
 
 # STL容器
 
+## 容器的共通能力
+
+1. 所有容器提供的都是“value语义”而非“reference语义”。容器进行元素的安插动作时，内部实施的是copy和/或move动作，而不是管理元素的reference。
+
+如果你想要存放的对象不具有public copy构造函数，或如果你要的不是复制（如复制动作花费太多时间，或你要的是被多个容器共享的元素），
+
+那么你就只能使用move操作，要么容器元素就必须是pointer或“用以指向对象”的pointer object
+
+2. 元素在容器内有其特定顺序。每一种容器都会提供若干“返回迭代器”的操作函数，这些迭代器可用来遍历各个元素。
+
+这是STL算法的关键接口。如果你在元素之间迭代多次，你会获得相同的次序，前提是不曾安插或删除元素。
+
+这甚至对无序（unordered）容器也适用——只要你不调用那种会增加或删除元素的操作，或强迫内部重整。
+
+
+3. 各项操作并非绝对安全，也就是说它们并不会检查每一个可能发生的错误。
+
+调用者必须确保传给操作函数的实参符合条件。违反条件（例如使用非法索引）会导致不明确的行为，那就是说任何事情都有可能发生。
+
+通常STL自己不会抛出异常。
+
+## 容器共通方法
+
+### 初始化
+
+    // 初始化列表的方法
+    const vector<int> v1 = {1, 2, 3, 4};
+    const vector<int> v2 {1, 2, 3, 4};
+    vector<string> v3 = {"11", string(), ""};
+
+    // 用一个容器的元素，构造另一个元素
+    list<int> l1;
+    vector<float> v4(l1.begin(), l1.end());
+    vector<float> v5(make_move_iterator(l1.begin()), make_move_iterator(l1.end()));
+
+    // C风格数组构造容器
+    int arr[] = {1, 2, 3, 4};
+    vector<int> v6(begin(arr), end(arr));
+
+    // 使用流进行初始化
+    vector<int> v7((istream_iterator<int>(cin)), istream_iterator<int>());
+    
+    // 内部会调用右值引用的 拷贝构造
+    vector<int> v8 = std::move(v7);
+
+### 赋值
+
+当你对着容器赋予元素时，来源容器的所有元素被复制到目标容器内，后者原本的元素全被移除。所以，容器的赋值动作代价相对高昂。
+
+自C++11起，你可以使用move assignment语义
+
+
+    vector<int> v8;
+    v8 = std::move(v7);
+
+所有容器都提供成员函数swap（），用来置换两容器的内容。事实上它只是置换若干内部pointer，
+
+所以swap（）保证常量复杂度，不像copy assignment是线性复杂度。
+
+容器的迭代器和用以指向元素的reference，都“密切紧盯”被置换的元素。
+
+因此swap（）之后原本存在的迭代器和reference都仍然指向原先所指的元素，只不过那些元素如今位于另一个容器中了。
+
+### 比较
+
+有序容器, 常用的比较操作符==、!=、＜、＜=、＞和＞=都依据以下三个规则被定义出来：
+
+1.比较动作的两端（两个容器）必须属于同一类型。
+
+2.如果两个容器的所有元素依序相等，那么这两个容器相等。操作符==被用来检查元素是否相等。
+
+3.采用“字典式（lexicographical）比较”来判断某个容器是否小于另一容器
+
+无序（unordered）容器只定义操作符==和!=，当容器内的每一个元素在另一容器内有相等元素，这些操作就返回true。元素次序无关紧要，因为它们是无序容器。
+
+
+若要比较两个不同类型的容器，必须使用STL比较算法
+
+### 元素访问
+
+    vector<int> v;
+
+    for (const auto &elem : v) {
+        cout << elem << endl;
+    }
+    for (auto &elem : v) {
+        cout << elem << endl;
+    }
+
+    for (auto pos = v.cbegin(); pos != v.cend(); ++pos) {
+        const auto &elem = *pos;
+        // ...
+    }
+    for (auto pos = v.cbegin(); pos != v.cend(); ++pos) {
+        auto &elem = *pos;
+        // ...
+    }
+
+
+
+如果其他元素被删除，所有容器（除了vector和deque）都保证迭代器以及用以指向元素的reference继续保持有效。但对于vector，只有删除点之前的元素才保持有效。
+
+如果你以 clear（）移除所有元素，对vector、deque和string而言，任何由 end（）或cend（）返回的逾尾（past-the-end）迭代器都可能失效。
+
+如果你安插元素，只有list、forward list和关联式容器保证原本的迭代器和用以指向元素的reference继续保持有效。
+
+对vector而言，这份保证只有当安插动作不超出容量才成立。
+
+至于无序（unordered）容器，上述保证对于reference一般是成立的，
+
+但对于迭代器则只有当“不发生rehashing”才成立，而只要安插后的最终元素总数小于bucket个数乘以最大负载系数，就不会发生rehashing。
+
 
