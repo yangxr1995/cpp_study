@@ -2818,4 +2818,228 @@ STL的设计宗旨是效能优先，安全次之
 
 但对于迭代器则只有当“不发生rehashing”才成立，而只要安插后的最终元素总数小于bucket个数乘以最大负载系数，就不会发生rehashing。
 
+## array
+它包覆一个寻常的static C-style array并提供一个STL容器接口
 
+观念上所谓array是指一系列元素，有着固定大小。因此你无法借由增加或移除元素而改变其大小。它只允许你替换元素值
+
+它比寻常的array安全，而且效率并没有因此变差。
+
+### array的实现
+
+
+
+    struct array
+      typedef __array_traits<_Tp, _Nm> _AT_Type;
+      typename _AT_Type::_Type                         _M_elems;
+
+    struct __array_traits
+      typedef _Tp _Type[_Nm];
+
+可见
+
+array<int, 10> a;
+相当于
+
+typedef int _Type[10];
+_Type a;
+
+即在栈上定义一个数组
+
+并且 数组的大小是在编译时期确定
+
+### array 的迭代器
+
+  template<typename _Tp, std::size_t _Nm>            // int, 10
+    struct array
+      typedef _Tp 	    			      value_type;  // int
+      typedef value_type*          		      iterator; // int *
+
+      begin() noexcept
+      { return iterator(data()); }   // (int *)(data())
+
+      end() noexcept
+      { return iterator(data() + _Nm); } (int *)(data() + 10)
+
+      _GLIBCXX17_CONSTEXPR pointer
+      data() noexcept
+      { return _AT_Type::_S_ptr(_M_elems); }  // 返回数组首元素的指针
+
+  template<typename _Tp, std::size_t _Nm>
+    struct __array_traits
+      static constexpr _Tp*
+      _S_ptr(const _Type& __t) noexcept
+      { return const_cast<_Tp*>(__t); }  // 传入指针，强制转换为 int *的指针
+
+可见array的速度上和C风格的数组是一样的，但是提供了STL的接口
+
+### 初始化
+
+array可以使用 initializer_list 初始化，但需要注意写法
+
+struct stu {
+    int id;
+    string name;
+    stu() {}
+    stu(int i, const string &name) : id(i), name(name) {}
+};
+
+int main() {
+    std::array<stu, 10> stu2 = { stu(1, "aaa")};
+    for (auto &elem : stu2) {
+        cout << elem.id << " " << elem.name << endl;
+    }
+    return 0;
+}
+
+# 常见错误总结
+
+## swap
+
+swap的实现如下, 可见涉及转移语义的拷贝构造和赋值
+
+      swap(array& __other)
+      { std::swap_ranges(begin(), end(), __other.begin()); }
+          _Tp __tmp = _GLIBCXX_MOVE(__a);
+          __a = _GLIBCXX_MOVE(__b);
+          __b = _GLIBCXX_MOVE(__tmp);
+
+如下代码编译报错
+
+struct stu {
+    stu &operator=(const stu &s) {
+        cout << "operator= stu&" << endl;
+        age = s.age;
+        return *this;
+    }
+
+    stu &operator=(stu &&s) {
+        cout << "operator= stu&&" << endl;
+        age = s.age;
+        return *this;
+    }
+
+    int age;
+};
+
+    array<stu, 10> stu1, stu2;
+    stu1.swap(stu2);
+
+原因如下
+
+当定义转移语义的赋值后，会优先使用转移语义的赋值，会导致`_Tp __tmp = _GLIBCXX_MOVE(__a);` 使用转移语义的拷贝构造，但编译器默认提供普通拷贝构造，导致报错
+
+修改如下
+
+struct stu {
+    stu(stu &&s) {}
+    stu &operator=(const stu &s) {
+        cout << "operator= stu&" << endl;
+        age = s.age;
+        return *this;
+    }
+
+    stu &operator=(stu &&s) {
+        cout << "operator= stu&&" << endl;
+        age = s.age;
+        return *this;
+    }
+
+    int age;
+};
+
+    array<stu, 10> stu1, stu2;
+    stu1.swap(stu2);
+
+但仍然会报错，因为提供了构造函数，编译器就不会再提供，导致 `array<stu, 10> stu1, stu2;` 找不到普通构造
+
+修改如下
+
+struct stu {
+    stu() {}
+    stu(stu &&s) {}
+    stu &operator=(const stu &s) {
+        cout << "operator= stu&" << endl;
+        age = s.age;
+        return *this;
+    }
+
+    stu &operator=(stu &&s) {
+        cout << "operator= stu&&" << endl;
+        age = s.age;
+        return *this;
+    }
+
+    int age;
+};
+
+    array<stu, 10> stu1, stu2;
+    stu1.swap(stu2);
+
+## initializer_list
+
+下面的代码 `stu() {}` 很可能被漏写
+
+struct stu {
+    int id;
+    string name;
+    stu() {}
+    stu(const stu &s) : id(s.id), name(s.name) {}
+    stu(int i, const string &name) : id(i), name(name) {}
+};
+
+int main() {
+    // stu(1, "aaa") --> stu(int i, const string &name)
+    // stu2[0] = stu(1, "aaa")  --> stu(const stu &s)
+    // stu2[1] =  --> stu()
+    // ...
+    std::array<stu, 10> stu2 = { stu(1, "aaa")};
+
+    for (auto &elem : stu2) {
+        cout << elem.id << " " << elem.name << endl;
+    }
+
+    return 0;
+}
+
+改下构造
+
+struct stu {
+    int id;
+    string name;
+    stu() {}
+    stu(const stu &s) : id(s.id), name(s.name) {}
+    stu(int i, const string &name) : id(i), name(name) {}
+};
+
+    // 第一个元素 stu(int i, const string &name)
+    // 其他元素 stu()
+    stu stu2[20] = {{1, "aaa"}};
+
+再改下
+    struct stu {
+        int id;
+        string name;
+        stu() {}
+        stu(int i) :id(i) {}
+        stu(const char *name) : name(name) {}
+        stu(const stu &s) : id(s.id), name(s.name) {}
+        stu(int i, const string &name) : id(i), name(name) {}
+    };
+
+    // 第一个元素 stu(int i)
+    // 第二个元素 stu(const char *name)
+    // 其他元素 stu()
+    std::array<stu, 10> stu2 = {{1, "aaa"}};
+
+再改下
+    // 第一个元素 stu(int i)
+    // 第二个元素 stu(const char *name)
+    // 其他元素
+    std::array<stu, 10> stu2 = {1, "aaa"};
+
+再改下
+
+    // 第一个元素 stu(int i, const string &name)
+    // 其他元素 stu()
+    std::array<stu, 10> stu2 = { stu(1, "aaa")};
