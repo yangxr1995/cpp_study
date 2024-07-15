@@ -2892,6 +2892,281 @@ int main() {
     return 0;
 }
 
+### swap 和 move语义
+
+array<string, 10> a1, a2;
+
+### 示例
+
+#include <array>
+#include <algorithm>
+#include <functional>
+#include <iostream>
+#include <numeric>
+
+using namespace std;
+
+#define PRINT(c)   \
+    for (auto &e : c) \
+        cout << e << " "; \
+    cout << endl; \
+
+int main (int argc, char *argv[]) {
+
+    array<int, 10> a = {11, 33, 44, 22};
+
+    PRINT(a);
+    a.back() = 11;
+    PRINT(a);
+    a[a.size() - 2] = 22;
+    PRINT(a);
+
+    cout << "sum :" << accumulate(a.begin(), a.end(), 0) << endl;
+
+    transform(a.begin(), a.end(), a.begin(), negate<int>());
+    PRINT(a);
+    return 0;
+}
+
+## vector
+
+### 示例
+
+#include <iterator>
+#include <string>
+#include <utility>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+
+    vector<string> v;
+
+    v.reserve(5);
+
+    v.push_back("hello,");
+    v.insert(v.end(), {"how", "are", "you", "?"});
+
+    copy(v.begin(), v.end(), ostream_iterator<string>(cout, " "));
+    cout << endl;
+
+    cout << "max_size() : " << v.max_size() << endl;
+    cout << "size() : " << v.size() << endl;
+    cout << "capacity() : " << v.capacity() << endl;
+
+    swap(v[2], v[3]);
+
+    v.insert(find(v.begin(), v.end(), "?"), "always");
+
+    v.back() = "!";
+
+    copy(v.cbegin(), v.cend(), ostream_iterator<string>(cout, " "));
+    cout << endl;
+
+    v.pop_back();
+    v.pop_back();
+    v.shrink_to_fit();
+
+    cout << "max_size() : " << v.max_size() << endl;
+    cout << "size() : " << v.size() << endl;
+    cout << "capacity() : " << v.capacity() << endl;
+
+    copy(v.cbegin(), v.cend(), ostream_iterator<string>(cout, " "));
+    cout << endl;
+
+    return 0;
+}
+
+## deque
+
+Deque与vector相比，功能上的差异如下：
+
+· 两端都能快速安插元素和移除元素（vector只在尾端逞威风）。这些操作可以在摊提的常量时间（amortized constant time）内完成。
+
+· 访问元素时deque内部结构会多一个间接过程，所以元素的访问和迭代器的动作会稍稍慢一些。
+
+· 迭代器需要在不同区块间跳转，所以必须是个smart pointer，不能是寻常pointer。
+
+· 在内存区块大小有限制的系统中（例如PC系统），deque可以内含更多元素，因为它使用不止一块内存。因此deque的max_size（）可能更大。
+
+· Deque不支持对容量和内存重新分配时机的控制。特别要注意的是，除了头尾两端，在任何地点安插或删除元素都将导致指向deque元素的任何pointer、reference和iterator失效。
+不过，deque的内存重分配优于vector，因为其内部结构显示，deque不必在内存重新分配时复制所有元素。
+
+· Deque会释放不再使用的内存区块。Deque的内存大小是可缩减的，但要不要这么做，以及如何做，由实现决定。
+
+Deque的以下特性跟Vector差不多：
+
+· 在中段安插、移除元素的速度相对较慢，因为所有元素都需移动以腾出或填补空间。
+
+· 迭代器属于random-access iterator（随机访问迭代器）。
+
+总之，以下情形最好采用deque：
+
+· 你需要在两端安插和移除元素（这是deque的拿手好戏）。
+
+· 无须指向（refer to）容器内的元素。
+
+· 要求“不再使用的元素必须释放”
+
+### 示例
+
+#include <iterator>
+#include <string>
+#include <deque>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    deque<string> d;
+
+    d.assign(3, string("string"));
+    d.push_back("last string");
+    d.push_front("first string");
+
+    copy(d.begin(), d.end(), ostream_iterator<string>(cout, ","));
+    cout << endl;
+
+    d.pop_back();
+    d.pop_front();
+
+    for (unsigned i = 1 ; i < d.size(); ++i) {
+        d[i] = "another" + d[i];
+    }
+
+    d.resize(4, "resize string");
+    copy(d.begin(), d.end(), ostream_iterator<string>(cout, ","));
+    cout << endl;
+
+
+    return 0;
+}
+
+## List
+List（我说的是容器类list＜＞的一个实例）使用一个doubly linked list（双向串列）管理元素，如图7.5所示。按惯例，C++标准库并未明定实现方式，只是遵守list的名称、限制和规格。
+
+list在几个主要方面与array、vector或deque不同：
+
+· List不支持随机访问。如果你要访问第5个元素，就得顺着串链逐一爬过前4个元素。所以，在list中随机巡访任意元素是很缓慢的行为。然而你可以从两端开始航行整个list，所以访问第一个或最末一个元素的速度很快。
+
+· 任何位置上（不只两端）执行元素的安插和移除都非常快，始终都是常量时间内完成，因为无须移动任何其他元素。实际上内部只是进行了一些pointer操作而已。
+
+· 安插和删除动作并不会造成指向其他元素的各个pointer、reference和iterator失效。
+
+· List对于异常的处理方式是：要么操作成功，要么什么都不发生。你绝不会陷入“只成功一半”这种进退维谷的尴尬境地。
+
+List所提供的成员函数反映出它和array、vector以及deque的不同：
+
+· List提供front（）、push_front（）和pop_front（）、back（）、push_back（）和pop_back（）等操作函数。
+
+· 由于不支持随机访问，list既不提供subscript（下标）操作符，也不提供at（）。
+
+· List并未提供容量、空间重新分配等操作函数，因为全无必要。每个元素有自己的内存，在元素被删除前一直有效。
+
+· List提供不少特殊成员函数，专门用于移动和移除元素。较之同名的STL通用算法，这些函数执行起来更快速，因为它们无须复制或搬移元素，只需调整若干pointer即可。
+
+### 随机访问
+
+c = c2  将c2所有元素赋值给c
+c = rv  将rv所有元素以转移语义赋值给c
+c = initlist 
+c.assign(n, elem) 复制n个elem给c
+c.assign(beg, end) [beg, end)区间内所有元素复制给c
+c.assign(initlist)
+c1.swap(c2)
+swap(c1, c2)
+
+c.front()  返回第一个元素 (不检查是否存在)
+c.back()   返回最后一个元素 (不检查是否存在)
+
+### 插入删除
+c.push_back(elem)
+c.pop_back()
+c.push_front(elem)
+c.pop_front()
+c.insert(pos, elem) pos之前插入元素,返回新元素的迭代器
+c.insert(pos, n, elem) pos之前插入n个元素, 返回新元素的第一个元素迭代器
+c.insert(pos, beg, end) 
+c.insert(pos, initlist)
+c.emplace(pos, args, ...) 在pos之前，插入一个以 args构造的元素,返回新元素的位置
+c.emplace_back(args, ...)
+c.emplace_front(args, ...)
+c.erase(pos) 移除pos指向的元素，返回下一个元素
+c.erase(beg, end) 移除[beg, end) 返回下一个元素
+c.remove(val) 移除所有值为val的元素
+c.remove_if(op) 移除所有op(elem)为真的元素
+c.resize(num) 将元素数量改为num,多出的元素以default构造
+c.resize(num, elem)
+c.clear() 移除所有元素
+
+### 排序合并
+c.unique() 如果相邻元素重复，就移除重复元素
+c.unique(op) 若相邻元素 op(elem, elem1) 为真，就移除相邻元素
+c.splice(pos, c2) 将c2所有元素转移到c之内，迭代器pos之前
+c.splice(pos, c2, c2pos) 将 c2容器内 c2pos 所指的一个元素移动到pos之前
+c.splice(pos, c2, c2beg, c2end) 将 [c2beg, c2end) 所有元素移动到pos之前
+c.sort() 以operator<进行排序
+c.sort(op) 以op(*e1, *e2) 进行排序  
+c.merge(c2) 假设c c2内已经排序，将c2所有元素转移到c,并保证合并后的list为已排序
+c.merge(c2, op) 假设c c2内已经排序，将c2所有元素转移到c,并保证合并后的list在op()准则下已排序
+c.reverse() 反转
+
+### 示例
+#include <iterator>
+#include <list>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+inline static void
+print_list(list<int> &l1, list<int> &l2)
+{
+    cout << "list1 :";
+    copy(l1.begin(), l1.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    cout << "list2 :";
+    copy(l2.begin(), l2.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+}
+
+int main (int argc, char *argv[]) {
+    list<int> l1, l2;
+
+    for (int i = 0; i < 6 ; ++i) {
+        l1.push_back(i);
+        l2.push_front(i);
+    }
+
+    print_list(l1, l2);
+
+    // 将 l1所有元素移动到 l2 中3的前一个位置
+    l2.splice(find(l2.begin(), l2.end(), 3), l1);
+
+    print_list(l1, l2);
+
+    // 将 l2.begin() 指向的元素移动到 l2.end() 的前一个位置
+    l2.splice(l2.end(), l2, l2.begin());
+
+    print_list(l1, l2);
+
+    l2.sort();
+    l1 = l2;
+    l2.unique();
+    print_list(l1, l2);
+
+    // 假设 l1 l2已经排序，将 l1 l2 合并到 l1 ，并排序
+    l1.merge(l2);
+    print_list(l1, l2);
+
+    return 0;
+}
+
 # 常见错误总结
 
 ## swap
