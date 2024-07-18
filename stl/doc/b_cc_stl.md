@@ -3167,6 +3167,280 @@ int main (int argc, char *argv[]) {
     return 0;
 }
 
+## forward_list
+
+### 构造析构
+
+forward_list<elem> c; default构造，没有任何元素
+forward_list<elem> c(c2); 拷贝构造
+forward_list<elem> c = c2; 拷贝构造
+forward_list<elem> c(rv); 转移语义拷贝构造
+forward_list<elem> c = rv; 转移语义拷贝构造
+forward_list<elem> c(n); 利用元素的default构造，生成n个元素
+forward_list<elem> c(n, elem); 利用元素的拷贝构造，生成n个元素
+forward_list<elem> c(beg, end); 
+forward_list<elem> c(initlist); 
+forward_list<elem> c = initlist;
+c.~forward_list();
+
+### 非更易操作
+forward list不提供size（）。如果你必须计算元素个数，可使用distance（）
+
+forward_list<int> l;
+cout << "l.size() : " << distance(l.begin(), l.end()) << endl;
+
+### 赋值
+c = c2;
+c = rv;
+c = initlist;
+c.assign(n, elem);
+c.assign(beg, end);
+c.assign(initlist);
+c1.swap(c2);
+swap(c1, c2);
+
+### 元素访问
+list相比，你唯一能够直接访问的元素是第一元素
+
+c.front();
+
+### 迭代器
+由于你只能以前行方向（forward order）遍历元素，所以这些迭代器是forward迭代器，不支持reverse迭代器
+
+因此，你无法调用那种需要用到双向（bidirectional）或随机（random-access）迭代器的算法,
+
+而所有“会大量改变元素次序”的算法，特别是sorting算法，都属此类。因此，forward list为排序提供了特殊成员函数sort（）
+
+此外还提供了before_begin（）和cbefore_begin（），产出更先于“第一元素”的一个虚拟元素位置。这是为了能够改动第一元素。
+
+
+c.begin()
+c.end()
+c.cbegin()
+c.cend()
+c.before_begin()  
+c.cbefore_begin()
+
+注意before_begin（）和cbefore_begin（）并不代表forward list的一个合法位置；提领（dereferencing）这些位置会导致不明确行为。
+
+也就是说，以before_begin（）为任何STL算法的第一实参都会导致运行期差错：
+
+copy(fwlist.before_begin(), fwlist.end(), ...); //error
+
+除了复制和赋值动作，对before_begin（）返回值的合法操作只有++、==和！=。
+
+
+### 插入删除
+
+面对forward list提供的所有安插、安放、抹除（insert，emplace，and erase）成员函数，你会有个疑问：它们需要获得一个元素位置，但对于forward list，你无法回头。
+
+这个不同也反映在成员函数的名称上。所有以_after为名称后缀的成员函数，会将新元素安插（或删除）于“给定元素”之后。
+
+    forward_list<int> l = {1, 2, 3};
+
+    // 在 1 后面追加 4, 5 ,6
+    l.insert_after(l.begin(), {4, 5, 6});
+
+    copy(l.begin(), l.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    // 错误
+    /*l.insert_after(l.end(), {10});*/
+
+    // 将10插入首部
+    l.insert_after(l.before_begin(), {10});
+
+forward_list支持的插入删除操作
+
+c.push_front(elem) 在头部插入elem的拷贝
+c.pop_front() 移除第一个元素，但不返回
+c.insert_after(pos, elem) 在pos之后插入元素elem的拷贝 ,并返回插入的元素的位置
+c.insert_after(pos, beg, end)
+c.insert_after(pos, initlist)
+c.emplace_after(pos, args, ...) 在pos之后插入一个以args构造的元素,并返回插入元素的位置
+c.emplace_front(args)
+c.erase_after(pos) 移除pos之后的一个元素, 不返回任何东西 
+c.erase_after(beg, end) 移除[beg, end) 区间的所有元素
+c.remove(val) 移除所有值为val的元素
+c.remove_if(op) 
+c.resize(num)
+c.resize(num, elem)
+c.clear()
+
+
+
+### 查找、移除或安插
+手上握着一个singly linked list，你就只能勇往向前。它的最大缺点是：当你尝试找出某元素，准备在那儿安插或删除，“找到的当下”代表“你已经过头了”，
+
+因为，欲在该处安插或删除元素，你必须改写该处的前一元素。因此你的查找准则应该是“下一元素满足条件”的当时元素
+
+    forward_list<int> l = {1, 2, 3};
+
+    // 在 2 前面插入新元素
+    auto pos_before = l.before_begin();
+    auto pos = l.begin();
+    for (; pos != l.end(); ++pos, ++pos_before) {
+        if (*pos == 2)
+            break;
+    }
+
+    if (pos != l.end()) {
+        l.insert_after(pos_before, {222});
+    }
+
+另一种简便的写法是对迭代器使用next
+
+    auto pos_before = l.before_begin();
+    for (; next(pos_before) != l.end(); ++pos_before) {
+        if (*next(pos_before) == 2)
+            break;
+    }
+
+    if (next(pos_before) != l.end()) {
+        l.insert_after(pos_before, {222});
+    }
+
+
+可以将常用操作封装为函数
+
+/*
+ * 找到 (first, last) 区间，值为val 的元素的前一个元素的位置
+ * 如果没有找到返回 last
+ */
+template<typename forward_iterator, typename Tp>
+inline forward_iterator
+find_before(forward_iterator first, forward_iterator last, Tp &&val)
+{
+    if (first == last)
+        return first;
+
+    forward_iterator next = std::next(first);
+
+    while (next != last && *next != val) {
+        ++next;
+        ++first;
+    }
+
+    if (next == last)
+        return last;
+
+    return first;
+}
+
+template<typename forward_iterator, typename pred>
+inline forward_iterator
+find_before_if(forward_iterator first, forward_iterator last, pred op)
+{
+    if (first == last)
+        return last;
+
+    forward_iterator next = std::next(first);
+
+    while (next != last && !op(*next)) {
+        ++next;
+        ++first;
+    }
+
+    if (next == last)
+        return last;
+
+    return first;
+}
+
+    forward_list<int> l = {1, 2, 3};
+
+    auto it = find_before_if(l.begin(), l.end(), [](int i) {
+            return i % 2 == 0;
+            });
+    cout << "首个偶数的前一个元素为 : " << *it << endl;
+
+
+### 连接函数
+
+list唯一不同的是，splice_after（）取代了splice（），因为传进去的是“splice所作用的元素位置”的前一元素位置。
+
+    forward_list<int> l1 = {1, 2, 3};
+    forward_list<int> l2 = {11, 222, 33};
+
+    auto p1 = find_before(l1.begin(), l1.end(), 2); // p1 -> 1
+    auto p2 = find_before(l2.begin(), l2.end(), 222); // p2 -> 11
+
+    if (p1 != l1.end() && p2 != l2.end()) {
+        // 把l2所有元素移动到 l1 的 p1 前面
+        /*l1.splice_after(p1, l2);*/
+        // 把l2 的 p2 后面一个元素移动到 l1 的 p1 前面
+        /*l1.splice_after(p1, l2, p2);*/
+        // 把l2 的 (p2, end) 元素移动到 l1 的 p1 前面
+        /*l1.splice_after(p1, l2, p2, l2.end());*/
+
+        // 把 p1后一个元素，放到 l2 的p2后面
+        l1.splice_after(p2, l2,  // dest
+                p1); // source
+
+        cout << "l1 : ";
+        copy(l1.begin(), l1.end(), ostream_iterator<int>(cout , " "));
+        cout << endl;
+
+        cout << "l2 : ";
+        copy(l2.begin(), l2.end(), ostream_iterator<int>(cout , " "));
+        cout << endl;
+    }
+
+
+其他操作
+
+c.unique()  移除相邻重复元素,只保留一个
+c.unique(op) 移除相邻且 op(elem) 都为真的元素，只保留一个
+c.splice_after(pos, c2) 将c2所有元素移动到 c的 pos 后面
+c.splice_after(pos, c2, pos2) 将 c2 的 pos2元素后的一个元素，移动到 pos后 
+c.splice_after(pos, c2, beg2, end2) 将c2的 (beg2, end2) 所有元素移动到 pos后
+c.sort() 以operator<排序
+c.sort(op)
+c.merge(c2) 假设c c2已排序，将c c2 按序大小顺序合并元素到 c
+c.merge(c2, op)
+c.reverse() 将所有元素反序
+
+### 示例
+template<typename List>
+inline void
+print_list(const char *prefix, List &&l)
+{
+    cout << prefix;
+    for (auto &e : l) {
+        cout << e << " ";
+    }
+    cout << endl;
+}
+
+int main (int argc, char *argv[]) {
+    forward_list<int> l1 = {1, 2, 3, 4, 5};
+    forward_list<int> l2 = {44, 55, 66};
+
+    l2.insert_after(l2.before_begin(), 99);
+    l2.push_front(10);
+    l2.insert_after(l2.before_begin(), {10, 11, 12, 13});
+    print_list("l2 :", l2);
+
+    l1.insert_after(l1.before_begin(), l2.begin(), l2.end());
+    print_list("l1 :", l1);
+
+    l2.erase_after(l2.begin()); // 删除 begin 后一个元素
+    l2.erase_after(find(l2.begin(), l2.end(), 99), l2.end()); // 删除99后所有元素
+    print_list("l2 :", l2);
+
+    l1.sort();
+    l2 = l1;
+    l2.unique();
+    print_list("l1 :", l1);
+    print_list("l2 :", l2);
+
+    l1.merge(l2);
+    print_list("l1 :", l1);
+    print_list("l2 :", l2);
+
+
+    return 0;
+}
 # 常见错误总结
 
 ## swap
