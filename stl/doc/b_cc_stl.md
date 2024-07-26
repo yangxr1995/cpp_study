@@ -3441,6 +3441,137 @@ int main (int argc, char *argv[]) {
 
     return 0;
 }
+
+## set 和 multiset
+
+set 和 multiset 通常以平衡二叉树实现。
+
+自动排序的主要优点在于令二叉树于查找元素时拥有良好效能。
+
+自动排序造成set和multiset的一个重要限制：你不能直接改变元素值，因为这样会打乱原本正确的顺序。
+
+因此，要改变元素值，必须先删除旧元素，再插入新元素。以下接口反映了这种行为：
+
+- Set和multiset不提供任何操作函数可以直接访问元素。
+
+- 通过迭代器进行元素间接访问，有一个限制：从迭代器的角度看，元素值是常量。
+
+### 构造
+
+set c
+set c(op) 以op为排序准则，构造空set
+set c(c2)
+set c = c2
+set c(rv)
+set c = rv
+set c(beg, end)
+set c(beg, end, op)
+set c(initlist)
+set c = initlist
+c.~set()
+
+其中set 可以使用以下形式
+set<elem>
+set<elem, op>
+multiset<elem>
+multiset<elem, op>
+
+### 特殊的查找
+
+c.count(val) 返回元素为val的元素个数
+c.find(val) 返回元素为val的第一个元素，如果找不到返回end()
+c.lower_bound(val) 返回val的第一个可安插位置，也就是元素值 >= val 的第一个元素
+c.upper_bound(val) 返回val的最后一个可安插位置，也就是元素值 > val 的第一个元素
+c.equal_range(val) 返回val的第一个和最后一个可安插位置，也就是元素值 == val 的第一个元素
+
+
+int main (int argc, char *argv[]) {
+    set<int> c;
+    c.insert(1);
+    c.insert(4);
+    c.insert(3);
+    c.insert(6);
+    c.insert(2);
+
+    copy(c.begin(), c.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    cout << "lower_bound(3) " << *c.lower_bound(3) << endl;
+    cout << "upper_bound(3) " << *c.upper_bound(3) << endl;
+    cout << "equal_range(3).first " << *c.equal_range(3).first << endl;
+    cout << "equal_range(3).second " << *c.equal_range(3).second << endl;
+
+    return 0;
+}
+
+
+### 赋值
+
+c = c2
+c = rv
+c = initlist
+c1.swap(c2)
+swap(c1, c2)
+
+### 插入删除
+
+c.insert(val) 插入val的拷贝，返回新元素的位置
+c.insert(pos, val)  插入val的拷贝，返回新元素的位置，pos只是提示，支持插入操作的查找起点，用于加快速度
+c.insert(beg, end)
+c.insert(initlist)
+c.emplace(args, ...) 插入以args为初值的元素，返回新元素的位置
+c.emplace_hint(pos, args, ...)
+c.erase(val) 移除所有和val相等的元素，返回移除的个数
+c.erase(pos)
+c.erase(beg, end)
+c.clear()
+
+
+处理多个元素的安插和移除时，对区间内的所有元素使用单一调用，会比多次调用更快速。
+
+multiset的insert（）、emplace（）和erase（）成员函数都会保存等值元素间的相对次序，插入的元素会被放在“既有的等值元素群”的末尾。
+
+注意，用以安插元素的函数：insert（）和emplace（），其返回类型不尽相同：
+
+set 的接口
+      std::pair<iterator, bool>
+      insert(value_type&& __x)
+
+      iterator
+      insert(const_iterator __position, const value_type& __x)
+
+	std::pair<iterator, bool>
+	emplace(_Args&&... __args)
+
+	iterator
+	emplace_hint(const_iterator __pos, _Args&&... __args)
+
+multiset的接口
+
+      iterator
+      insert(const value_type& __x)
+
+      iterator
+      insert(const_iterator __position, const value_type& __x)
+
+	iterator
+	emplace(_Args&&... __args)
+
+	iterator
+	emplace_hint(const_iterator __pos, _Args&&... __args)
+
+返回类型之所以不相同，原因是：multiset允许元素重复而set不允许。因此，如果将某元素安插至set内，
+
+而该set已经内含同值元素，安插动作将告失败。所以set的返回类型是以pair组织起来的两个值
+
+
+1.pair结构中的second成员表示安插是否成功。
+
+2.pair结构中的first成员表示新元素的位置，或现存的同值元素的位置。
+
+
+
+
 # 常见错误总结
 
 ## swap
