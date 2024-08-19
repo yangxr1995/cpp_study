@@ -3006,6 +3006,683 @@ c.clear() 移除所有元素，将容器清空
 printf("%s", v.begin()); // error
 printf("%s", v.data()); // ok
 printf("%s", &v[0]); // ok
+### swap 和 move语义
+
+array<string, 10> a1, a2;
+
+### 示例
+
+#include <array>
+#include <algorithm>
+#include <functional>
+#include <iostream>
+#include <numeric>
+
+using namespace std;
+
+#define PRINT(c)   \
+    for (auto &e : c) \
+        cout << e << " "; \
+    cout << endl; \
+
+int main (int argc, char *argv[]) {
+
+    array<int, 10> a = {11, 33, 44, 22};
+
+    PRINT(a);
+    a.back() = 11;
+    PRINT(a);
+    a[a.size() - 2] = 22;
+    PRINT(a);
+
+    cout << "sum :" << accumulate(a.begin(), a.end(), 0) << endl;
+
+    transform(a.begin(), a.end(), a.begin(), negate<int>());
+    PRINT(a);
+    return 0;
+}
+
+## vector
+
+### 示例
+
+#include <iterator>
+#include <string>
+#include <utility>
+#include <vector>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+
+    vector<string> v;
+
+    v.reserve(5);
+
+    v.push_back("hello,");
+    v.insert(v.end(), {"how", "are", "you", "?"});
+
+    copy(v.begin(), v.end(), ostream_iterator<string>(cout, " "));
+    cout << endl;
+
+    cout << "max_size() : " << v.max_size() << endl;
+    cout << "size() : " << v.size() << endl;
+    cout << "capacity() : " << v.capacity() << endl;
+
+    swap(v[2], v[3]);
+
+    v.insert(find(v.begin(), v.end(), "?"), "always");
+
+    v.back() = "!";
+
+    copy(v.cbegin(), v.cend(), ostream_iterator<string>(cout, " "));
+    cout << endl;
+
+    v.pop_back();
+    v.pop_back();
+    v.shrink_to_fit();
+
+    cout << "max_size() : " << v.max_size() << endl;
+    cout << "size() : " << v.size() << endl;
+    cout << "capacity() : " << v.capacity() << endl;
+
+    copy(v.cbegin(), v.cend(), ostream_iterator<string>(cout, " "));
+    cout << endl;
+
+    return 0;
+}
+
+## deque
+
+Deque与vector相比，功能上的差异如下：
+
+· 两端都能快速安插元素和移除元素（vector只在尾端逞威风）。这些操作可以在摊提的常量时间（amortized constant time）内完成。
+
+· 访问元素时deque内部结构会多一个间接过程，所以元素的访问和迭代器的动作会稍稍慢一些。
+
+· 迭代器需要在不同区块间跳转，所以必须是个smart pointer，不能是寻常pointer。
+
+· 在内存区块大小有限制的系统中（例如PC系统），deque可以内含更多元素，因为它使用不止一块内存。因此deque的max_size（）可能更大。
+
+· Deque不支持对容量和内存重新分配时机的控制。特别要注意的是，除了头尾两端，在任何地点安插或删除元素都将导致指向deque元素的任何pointer、reference和iterator失效。
+不过，deque的内存重分配优于vector，因为其内部结构显示，deque不必在内存重新分配时复制所有元素。
+
+· Deque会释放不再使用的内存区块。Deque的内存大小是可缩减的，但要不要这么做，以及如何做，由实现决定。
+
+Deque的以下特性跟Vector差不多：
+
+· 在中段安插、移除元素的速度相对较慢，因为所有元素都需移动以腾出或填补空间。
+
+· 迭代器属于random-access iterator（随机访问迭代器）。
+
+总之，以下情形最好采用deque：
+
+· 你需要在两端安插和移除元素（这是deque的拿手好戏）。
+
+· 无须指向（refer to）容器内的元素。
+
+· 要求“不再使用的元素必须释放”
+
+### 示例
+
+#include <iterator>
+#include <string>
+#include <deque>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+int main (int argc, char *argv[]) {
+    deque<string> d;
+
+    d.assign(3, string("string"));
+    d.push_back("last string");
+    d.push_front("first string");
+
+    copy(d.begin(), d.end(), ostream_iterator<string>(cout, ","));
+    cout << endl;
+
+    d.pop_back();
+    d.pop_front();
+
+    for (unsigned i = 1 ; i < d.size(); ++i) {
+        d[i] = "another" + d[i];
+    }
+
+    d.resize(4, "resize string");
+    copy(d.begin(), d.end(), ostream_iterator<string>(cout, ","));
+    cout << endl;
+
+
+    return 0;
+}
+
+## List
+List（我说的是容器类list＜＞的一个实例）使用一个doubly linked list（双向串列）管理元素，如图7.5所示。按惯例，C++标准库并未明定实现方式，只是遵守list的名称、限制和规格。
+
+list在几个主要方面与array、vector或deque不同：
+
+· List不支持随机访问。如果你要访问第5个元素，就得顺着串链逐一爬过前4个元素。所以，在list中随机巡访任意元素是很缓慢的行为。然而你可以从两端开始航行整个list，所以访问第一个或最末一个元素的速度很快。
+
+· 任何位置上（不只两端）执行元素的安插和移除都非常快，始终都是常量时间内完成，因为无须移动任何其他元素。实际上内部只是进行了一些pointer操作而已。
+
+· 安插和删除动作并不会造成指向其他元素的各个pointer、reference和iterator失效。
+
+· List对于异常的处理方式是：要么操作成功，要么什么都不发生。你绝不会陷入“只成功一半”这种进退维谷的尴尬境地。
+
+List所提供的成员函数反映出它和array、vector以及deque的不同：
+
+· List提供front（）、push_front（）和pop_front（）、back（）、push_back（）和pop_back（）等操作函数。
+
+· 由于不支持随机访问，list既不提供subscript（下标）操作符，也不提供at（）。
+
+· List并未提供容量、空间重新分配等操作函数，因为全无必要。每个元素有自己的内存，在元素被删除前一直有效。
+
+· List提供不少特殊成员函数，专门用于移动和移除元素。较之同名的STL通用算法，这些函数执行起来更快速，因为它们无须复制或搬移元素，只需调整若干pointer即可。
+
+### 随机访问
+
+c = c2  将c2所有元素赋值给c
+c = rv  将rv所有元素以转移语义赋值给c
+c = initlist 
+c.assign(n, elem) 复制n个elem给c
+c.assign(beg, end) [beg, end)区间内所有元素复制给c
+c.assign(initlist)
+c1.swap(c2)
+swap(c1, c2)
+
+c.front()  返回第一个元素 (不检查是否存在)
+c.back()   返回最后一个元素 (不检查是否存在)
+
+### 插入删除
+c.push_back(elem)
+c.pop_back()
+c.push_front(elem)
+c.pop_front()
+c.insert(pos, elem) pos之前插入元素,返回新元素的迭代器
+c.insert(pos, n, elem) pos之前插入n个元素, 返回新元素的第一个元素迭代器
+c.insert(pos, beg, end) 
+c.insert(pos, initlist)
+c.emplace(pos, args, ...) 在pos之前，插入一个以 args构造的元素,返回新元素的位置
+c.emplace_back(args, ...)
+c.emplace_front(args, ...)
+c.erase(pos) 移除pos指向的元素，返回下一个元素
+c.erase(beg, end) 移除[beg, end) 返回下一个元素
+c.remove(val) 移除所有值为val的元素
+c.remove_if(op) 移除所有op(elem)为真的元素
+c.resize(num) 将元素数量改为num,多出的元素以default构造
+c.resize(num, elem)
+c.clear() 移除所有元素
+
+### 排序合并
+c.unique() 如果相邻元素重复，就移除重复元素
+c.unique(op) 若相邻元素 op(elem, elem1) 为真，就移除相邻元素
+c.splice(pos, c2) 将c2所有元素转移到c之内，迭代器pos之前
+c.splice(pos, c2, c2pos) 将 c2容器内 c2pos 所指的一个元素移动到pos之前
+c.splice(pos, c2, c2beg, c2end) 将 [c2beg, c2end) 所有元素移动到pos之前
+c.sort() 以operator<进行排序
+c.sort(op) 以op(*e1, *e2) 进行排序  
+c.merge(c2) 假设c c2内已经排序，将c2所有元素转移到c,并保证合并后的list为已排序
+c.merge(c2, op) 假设c c2内已经排序，将c2所有元素转移到c,并保证合并后的list在op()准则下已排序
+c.reverse() 反转
+
+### 示例
+#include <iterator>
+#include <list>
+#include <algorithm>
+#include <iostream>
+
+using namespace std;
+
+inline static void
+print_list(list<int> &l1, list<int> &l2)
+{
+    cout << "list1 :";
+    copy(l1.begin(), l1.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    cout << "list2 :";
+    copy(l2.begin(), l2.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+}
+
+int main (int argc, char *argv[]) {
+    list<int> l1, l2;
+
+    for (int i = 0; i < 6 ; ++i) {
+        l1.push_back(i);
+        l2.push_front(i);
+    }
+
+    print_list(l1, l2);
+
+    // 将 l1所有元素移动到 l2 中3的前一个位置
+    l2.splice(find(l2.begin(), l2.end(), 3), l1);
+
+    print_list(l1, l2);
+
+    // 将 l2.begin() 指向的元素移动到 l2.end() 的前一个位置
+    l2.splice(l2.end(), l2, l2.begin());
+
+    print_list(l1, l2);
+
+    l2.sort();
+    l1 = l2;
+    l2.unique();
+    print_list(l1, l2);
+
+    // 假设 l1 l2已经排序，将 l1 l2 合并到 l1 ，并排序
+    l1.merge(l2);
+    print_list(l1, l2);
+
+    return 0;
+}
+
+## forward_list
+
+### 构造析构
+
+forward_list<elem> c; default构造，没有任何元素
+forward_list<elem> c(c2); 拷贝构造
+forward_list<elem> c = c2; 拷贝构造
+forward_list<elem> c(rv); 转移语义拷贝构造
+forward_list<elem> c = rv; 转移语义拷贝构造
+forward_list<elem> c(n); 利用元素的default构造，生成n个元素
+forward_list<elem> c(n, elem); 利用元素的拷贝构造，生成n个元素
+forward_list<elem> c(beg, end); 
+forward_list<elem> c(initlist); 
+forward_list<elem> c = initlist;
+c.~forward_list();
+
+### 非更易操作
+forward list不提供size（）。如果你必须计算元素个数，可使用distance（）
+
+forward_list<int> l;
+cout << "l.size() : " << distance(l.begin(), l.end()) << endl;
+
+### 赋值
+c = c2;
+c = rv;
+c = initlist;
+c.assign(n, elem);
+c.assign(beg, end);
+c.assign(initlist);
+c1.swap(c2);
+swap(c1, c2);
+
+### 元素访问
+list相比，你唯一能够直接访问的元素是第一元素
+
+c.front();
+
+### 迭代器
+由于你只能以前行方向（forward order）遍历元素，所以这些迭代器是forward迭代器，不支持reverse迭代器
+
+因此，你无法调用那种需要用到双向（bidirectional）或随机（random-access）迭代器的算法,
+
+而所有“会大量改变元素次序”的算法，特别是sorting算法，都属此类。因此，forward list为排序提供了特殊成员函数sort（）
+
+此外还提供了before_begin（）和cbefore_begin（），产出更先于“第一元素”的一个虚拟元素位置。这是为了能够改动第一元素。
+
+
+c.begin()
+c.end()
+c.cbegin()
+c.cend()
+c.before_begin()  
+c.cbefore_begin()
+
+注意before_begin（）和cbefore_begin（）并不代表forward list的一个合法位置；提领（dereferencing）这些位置会导致不明确行为。
+
+也就是说，以before_begin（）为任何STL算法的第一实参都会导致运行期差错：
+
+copy(fwlist.before_begin(), fwlist.end(), ...); //error
+
+除了复制和赋值动作，对before_begin（）返回值的合法操作只有++、==和！=。
+
+
+### 插入删除
+
+面对forward list提供的所有安插、安放、抹除（insert，emplace，and erase）成员函数，你会有个疑问：它们需要获得一个元素位置，但对于forward list，你无法回头。
+
+这个不同也反映在成员函数的名称上。所有以_after为名称后缀的成员函数，会将新元素安插（或删除）于“给定元素”之后。
+
+    forward_list<int> l = {1, 2, 3};
+
+    // 在 1 后面追加 4, 5 ,6
+    l.insert_after(l.begin(), {4, 5, 6});
+
+    copy(l.begin(), l.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    // 错误
+    /*l.insert_after(l.end(), {10});*/
+
+    // 将10插入首部
+    l.insert_after(l.before_begin(), {10});
+
+forward_list支持的插入删除操作
+
+c.push_front(elem) 在头部插入elem的拷贝
+c.pop_front() 移除第一个元素，但不返回
+c.insert_after(pos, elem) 在pos之后插入元素elem的拷贝 ,并返回插入的元素的位置
+c.insert_after(pos, beg, end)
+c.insert_after(pos, initlist)
+c.emplace_after(pos, args, ...) 在pos之后插入一个以args构造的元素,并返回插入元素的位置
+c.emplace_front(args)
+c.erase_after(pos) 移除pos之后的一个元素, 不返回任何东西 
+c.erase_after(beg, end) 移除[beg, end) 区间的所有元素
+c.remove(val) 移除所有值为val的元素
+c.remove_if(op) 
+c.resize(num)
+c.resize(num, elem)
+c.clear()
+
+
+
+### 查找、移除或安插
+手上握着一个singly linked list，你就只能勇往向前。它的最大缺点是：当你尝试找出某元素，准备在那儿安插或删除，“找到的当下”代表“你已经过头了”，
+
+因为，欲在该处安插或删除元素，你必须改写该处的前一元素。因此你的查找准则应该是“下一元素满足条件”的当时元素
+
+    forward_list<int> l = {1, 2, 3};
+
+    // 在 2 前面插入新元素
+    auto pos_before = l.before_begin();
+    auto pos = l.begin();
+    for (; pos != l.end(); ++pos, ++pos_before) {
+        if (*pos == 2)
+            break;
+    }
+
+    if (pos != l.end()) {
+        l.insert_after(pos_before, {222});
+    }
+
+另一种简便的写法是对迭代器使用next
+
+    auto pos_before = l.before_begin();
+    for (; next(pos_before) != l.end(); ++pos_before) {
+        if (*next(pos_before) == 2)
+            break;
+    }
+
+    if (next(pos_before) != l.end()) {
+        l.insert_after(pos_before, {222});
+    }
+
+
+可以将常用操作封装为函数
+
+/*
+ * 找到 (first, last) 区间，值为val 的元素的前一个元素的位置
+ * 如果没有找到返回 last
+ */
+template<typename forward_iterator, typename Tp>
+inline forward_iterator
+find_before(forward_iterator first, forward_iterator last, Tp &&val)
+{
+    if (first == last)
+        return first;
+
+    forward_iterator next = std::next(first);
+
+    while (next != last && *next != val) {
+        ++next;
+        ++first;
+    }
+
+    if (next == last)
+        return last;
+
+    return first;
+}
+
+template<typename forward_iterator, typename pred>
+inline forward_iterator
+find_before_if(forward_iterator first, forward_iterator last, pred op)
+{
+    if (first == last)
+        return last;
+
+    forward_iterator next = std::next(first);
+
+    while (next != last && !op(*next)) {
+        ++next;
+        ++first;
+    }
+
+    if (next == last)
+        return last;
+
+    return first;
+}
+
+    forward_list<int> l = {1, 2, 3};
+
+    auto it = find_before_if(l.begin(), l.end(), [](int i) {
+            return i % 2 == 0;
+            });
+    cout << "首个偶数的前一个元素为 : " << *it << endl;
+
+
+### 连接函数
+
+list唯一不同的是，splice_after（）取代了splice（），因为传进去的是“splice所作用的元素位置”的前一元素位置。
+
+    forward_list<int> l1 = {1, 2, 3};
+    forward_list<int> l2 = {11, 222, 33};
+
+    auto p1 = find_before(l1.begin(), l1.end(), 2); // p1 -> 1
+    auto p2 = find_before(l2.begin(), l2.end(), 222); // p2 -> 11
+
+    if (p1 != l1.end() && p2 != l2.end()) {
+        // 把l2所有元素移动到 l1 的 p1 前面
+        /*l1.splice_after(p1, l2);*/
+        // 把l2 的 p2 后面一个元素移动到 l1 的 p1 前面
+        /*l1.splice_after(p1, l2, p2);*/
+        // 把l2 的 (p2, end) 元素移动到 l1 的 p1 前面
+        /*l1.splice_after(p1, l2, p2, l2.end());*/
+
+        // 把 p1后一个元素，放到 l2 的p2后面
+        l1.splice_after(p2, l2,  // dest
+                p1); // source
+
+        cout << "l1 : ";
+        copy(l1.begin(), l1.end(), ostream_iterator<int>(cout , " "));
+        cout << endl;
+
+        cout << "l2 : ";
+        copy(l2.begin(), l2.end(), ostream_iterator<int>(cout , " "));
+        cout << endl;
+    }
+
+
+其他操作
+
+c.unique()  移除相邻重复元素,只保留一个
+c.unique(op) 移除相邻且 op(elem) 都为真的元素，只保留一个
+c.splice_after(pos, c2) 将c2所有元素移动到 c的 pos 后面
+c.splice_after(pos, c2, pos2) 将 c2 的 pos2元素后的一个元素，移动到 pos后 
+c.splice_after(pos, c2, beg2, end2) 将c2的 (beg2, end2) 所有元素移动到 pos后
+c.sort() 以operator<排序
+c.sort(op)
+c.merge(c2) 假设c c2已排序，将c c2 按序大小顺序合并元素到 c
+c.merge(c2, op)
+c.reverse() 将所有元素反序
+
+### 示例
+template<typename List>
+inline void
+print_list(const char *prefix, List &&l)
+{
+    cout << prefix;
+    for (auto &e : l) {
+        cout << e << " ";
+    }
+    cout << endl;
+}
+
+int main (int argc, char *argv[]) {
+    forward_list<int> l1 = {1, 2, 3, 4, 5};
+    forward_list<int> l2 = {44, 55, 66};
+
+    l2.insert_after(l2.before_begin(), 99);
+    l2.push_front(10);
+    l2.insert_after(l2.before_begin(), {10, 11, 12, 13});
+    print_list("l2 :", l2);
+
+    l1.insert_after(l1.before_begin(), l2.begin(), l2.end());
+    print_list("l1 :", l1);
+
+    l2.erase_after(l2.begin()); // 删除 begin 后一个元素
+    l2.erase_after(find(l2.begin(), l2.end(), 99), l2.end()); // 删除99后所有元素
+    print_list("l2 :", l2);
+
+    l1.sort();
+    l2 = l1;
+    l2.unique();
+    print_list("l1 :", l1);
+    print_list("l2 :", l2);
+
+    l1.merge(l2);
+    print_list("l1 :", l1);
+    print_list("l2 :", l2);
+
+
+    return 0;
+}
+
+## set 和 multiset
+
+set 和 multiset 通常以平衡二叉树实现。
+
+自动排序的主要优点在于令二叉树于查找元素时拥有良好效能。
+
+自动排序造成set和multiset的一个重要限制：你不能直接改变元素值，因为这样会打乱原本正确的顺序。
+
+因此，要改变元素值，必须先删除旧元素，再插入新元素。以下接口反映了这种行为：
+
+- Set和multiset不提供任何操作函数可以直接访问元素。
+
+- 通过迭代器进行元素间接访问，有一个限制：从迭代器的角度看，元素值是常量。
+
+### 构造
+
+set c
+set c(op) 以op为排序准则，构造空set
+set c(c2)
+set c = c2
+set c(rv)
+set c = rv
+set c(beg, end)
+set c(beg, end, op)
+set c(initlist)
+set c = initlist
+c.~set()
+
+其中set 可以使用以下形式
+set<elem>
+set<elem, op>
+multiset<elem>
+multiset<elem, op>
+
+### 特殊的查找
+
+c.count(val) 返回元素为val的元素个数
+c.find(val) 返回元素为val的第一个元素，如果找不到返回end()
+c.lower_bound(val) 返回val的第一个可安插位置，也就是元素值 >= val 的第一个元素
+c.upper_bound(val) 返回val的最后一个可安插位置，也就是元素值 > val 的第一个元素
+c.equal_range(val) 返回val的第一个和最后一个可安插位置，也就是元素值 == val 的第一个元素
+
+
+int main (int argc, char *argv[]) {
+    set<int> c;
+    c.insert(1);
+    c.insert(4);
+    c.insert(3);
+    c.insert(6);
+    c.insert(2);
+
+    copy(c.begin(), c.end(), ostream_iterator<int>(cout, " "));
+    cout << endl;
+
+    cout << "lower_bound(3) " << *c.lower_bound(3) << endl;
+    cout << "upper_bound(3) " << *c.upper_bound(3) << endl;
+    cout << "equal_range(3).first " << *c.equal_range(3).first << endl;
+    cout << "equal_range(3).second " << *c.equal_range(3).second << endl;
+
+    return 0;
+}
+
+
+### 赋值
+
+c = c2
+c = rv
+c = initlist
+c1.swap(c2)
+swap(c1, c2)
+
+### 插入删除
+
+c.insert(val) 插入val的拷贝，返回新元素的位置
+c.insert(pos, val)  插入val的拷贝，返回新元素的位置，pos只是提示，支持插入操作的查找起点，用于加快速度
+c.insert(beg, end)
+c.insert(initlist)
+c.emplace(args, ...) 插入以args为初值的元素，返回新元素的位置
+c.emplace_hint(pos, args, ...)
+c.erase(val) 移除所有和val相等的元素，返回移除的个数
+c.erase(pos)
+c.erase(beg, end)
+c.clear()
+
+
+处理多个元素的安插和移除时，对区间内的所有元素使用单一调用，会比多次调用更快速。
+
+multiset的insert（）、emplace（）和erase（）成员函数都会保存等值元素间的相对次序，插入的元素会被放在“既有的等值元素群”的末尾。
+
+注意，用以安插元素的函数：insert（）和emplace（），其返回类型不尽相同：
+
+set 的接口
+      std::pair<iterator, bool>
+      insert(value_type&& __x)
+
+      iterator
+      insert(const_iterator __position, const value_type& __x)
+
+	std::pair<iterator, bool>
+	emplace(_Args&&... __args)
+
+	iterator
+	emplace_hint(const_iterator __pos, _Args&&... __args)
+
+multiset的接口
+
+      iterator
+      insert(const value_type& __x)
+
+      iterator
+      insert(const_iterator __position, const value_type& __x)
+
+	iterator
+	emplace(_Args&&... __args)
+
+	iterator
+	emplace_hint(const_iterator __pos, _Args&&... __args)
+
+返回类型之所以不相同，原因是：multiset允许元素重复而set不允许。因此，如果将某元素安插至set内，
+
+而该set已经内含同值元素，安插动作将告失败。所以set的返回类型是以pair组织起来的两个值
+
+
+1.pair结构中的second成员表示安插是否成功。
+
+2.pair结构中的first成员表示新元素的位置，或现存的同值元素的位置。
+
 
 # 常见错误总结
 
