@@ -2892,6 +2892,121 @@ int main() {
     return 0;
 }
 
+## vector
+
+### 容量
+Vector的容量之所以重要，有两个原因：
+
+- 一旦内存重新分配，vector元素相关的所有reference、pointer、iterator都会失效。
+- 内存重新分配很耗时间。
+
+可以使用reserve（）保留适当容量，避免重新分配内存。
+
+vector的容量不会缩减，我们便可确定，即使删除元素，其reference、pointer和iterator 也会继续有效，
+
+继续指向动作发生前的位置。然而安插动作却可能使reference、pointer和iterator失效(因为安插可能导致vector重新分配)
+
+C++11引入一个vector新函数：一个不具强制力的要求，可以缩减容量以符合当前的元素个数。
+
+v.shrink_to_fit();
+
+这个要求不具强制力，以便为实现可能的特有优化保留回旋余地。因此你不能够期望之后的v.capacity==v.size（）会获得true。
+
+在C++11之前，有一个间接缩减vector容量的小窍门：两个vector交换内容后，两者的容量也会互换，因此下面的例子虽然保留了元素，却缩减了容量。
+
+    std::vector<int> tmp(v); // 拷贝所有成员到 tmp
+    v.swap(tmp); // 将tmp和 v交换内部数据
+
+    // 更简洁的写法
+    std::vector<int>(v).swap(v);
+
+不过请注意，swap（）之后原先所有的reference、pointer和iterator都换了指向对象；它们仍然指向原本位置。换句话说，
+
+上述的shrinkCapacity（）使所有reference、pointer和iterator失效。shrink_to_fit（）同样如此
+
+### 元素访问
+at（）会抛出out_of_range异常。其他函数都不做检查，如果发生越界错误，会引发不明确的行为。
+
+对一个空vector调用operator []、front（）和back（），也都会引发不明确行为
+
+### 插入 移除
+
+安插或移除元素，都会使“作用点”之后的各元素的reference、pointer和iterator失效。如果安插动作甚至引发内存重新分配，
+
+那么该容器身上的所有reference、pointer和iterator都会失效。
+
+Vector并未提供任何函数可以直接移除“与某值相等”的所有元素。这是算法发挥威力的时候。以下语句可将值为val的所有元素移除：
+
+    std::vector<int> v = {10, 10, 10, 1, 10, 10, 10, 10};
+    int val = 10;
+    // 将v中所有和val相等的元素删除
+    v.erase(std::remove(v.begin(), v.end(), val), v.end());
+
+解释下代码
+
+    auto it = std::remove(v.begin(), v.end(), val)
+    //  {10, 10, 10, 1, 10, 10, 10, 10};
+    //  {1,  10, 10, 1, 10, 10, 10, 10};
+             ^it
+
+    remove(_ForwardIterator __first, _ForwardIterator __last,
+	   const _Tp& __value)
+    remove会从 __first 到 __last 中见元素等于 __value 的转移到 it 的左边, [it, __last)就是被删除的，并返回it
+    remove本身只进行内部数据的移动，不进行删除，所有调用者需要使用 erase
+    erase(_ForwardIterator __first, _ForwardIterator __last) 将 [__first, __last)区间内的元素析构
+
+vector支持的插入删除操作
+
+c.push_back(elem) 拷贝elem到尾部 
+c.pop_back()      移除最后一个元素，但是不返回
+c.insert(pos, elem) 在 pos前插入elem的拷贝，返回新元素的位置
+c.insert(pos, n, elem) 在pos前插入n个elem拷贝,返回第一个新元素（或返回pos,如果没有新元素的话）
+c.insert(pos, beg, end) 在pos前插入[beg, end) 内所有元素的拷贝，返回第一个新元素（或返回pos,如果没有新元素的话）
+c.insert(pos, initlist) 在pos前插入 initlist 内所有元素的拷贝, 返回第一个新元素（或返回pos,如果没有新元素的话）
+c.emplace(pos, args, ...) 在pos前插入一个以args 为初始值的元素，并返回新元素
+c.emplace_back(args, ...) 追加一个以args为初始值的元素，并返回新元素
+c.erase(pos) 移除pos位置上的元素，返回下一个元素的位置
+c.erase(beg, end) 移除[beg, end)位置上的元素，返回下一个元素的位置
+c.resize(num) 将元素数量改为num(如果size()变大，多出的元素以default构造函数完成初始化)
+c.resize(num, elem) 将元素数量改为num(如果size()变大，多出的元素以elem拷贝初始化)
+c.clear() 移除所有元素，将容器清空
+
+如果只删除一个和目标值相等的元素，可以这样做
+
+    auto pos = std::find(v.begin(), v.end(), val);
+    if (pos != v.end()) // erase 不做 pos 为 v.end() 的异常检测，所以必须这样写
+        v.erase(pos);
+
+### 将vector当C 数组使用
+
+就像class array＜＞一样，C++标准库保证vector的元素必须分布于连续空间中。因此你可以确定，对于vector v中任意一个合法索引i，以下肯定为true
+
+    &v[i] == &v[0] + i
+
+证了这一点，就可推导出一系列重要结果。简单的说，任何地点只要你需要一个 dy-namic array，你就可以使用 vector。
+
+例如你可利用 vector 存放寻常的 C 字符串
+
+    vector<char> v;
+    v.resize(41);
+    strcpy(&v[0], "hello");
+    printf("%s", &v[0]);
+
+然而请注意，自C++11起，如果想直接访问vector的元素，不一定要用&a[0]，因为成员函数data（）也具备相同用途
+
+    vector<char> v;
+    v.resize(41);
+    strcpy(v.data, "hello");
+    printf("%s", v.data);
+
+无论什么理由，当你需要一个元素类型为T的array（例如为了使用一个旧有的C程序库），可以使用vector＜T＞并将第一元素的地址传入。
+
+注意，千万不要把迭代器当作“第一元素的地址”来传递。Vector迭代器是由实现定义的，也许并不是个寻常pointer：
+
+printf("%s", v.begin()); // error
+printf("%s", v.data()); // ok
+printf("%s", &v[0]); // ok
+
 # 常见错误总结
 
 ## swap
