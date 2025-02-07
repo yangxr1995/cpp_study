@@ -1,13 +1,58 @@
-# 编译原理
-## 预编译
-## 编译
-词法，语法分析，生成汇编
+[[toc]]
 
-编译后会根据源文件生成符号
+# 重要的背景知识
+## 涉及编译链接
 
-## 汇编
+### 如何生成C++函数符号的名称
+C++符号根据 作用域+模板参数列表+函数名+参数列表组成
 
+使用 c++filt 可以将根据符号得到真正的函数类型
+
+```shell
+root@u22:/mnt/share/cpp_study/test# c++filt _Z3cmpIiEiT_S0_
+int cmp<int>(int, int)
+```
 ### 链接符号
+
+符号表是链接的关键，使用readelf可以查看
+
+```shell
+root@u22:/mnt/share/cpp_study/test# readelf -s main.o
+
+Symbol table '.symtab' contains 16 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS main.cpp
+     2: 0000000000000000     0 SECTION LOCAL  DEFAULT    3 .text
+     3: 000000000000001e    11 FUNC    LOCAL  DEFAULT    3 _ZL5func3v
+     4: 0000000000000004     4 OBJECT  LOCAL  DEFAULT    6 _ZL1b
+     5: 0000000000000000     0 SECTION LOCAL  DEFAULT    7 .text._Z3cmpIiEvT_S0_
+     6: 0000000000000000     0 SECTION LOCAL  DEFAULT    8 .text._Z3cmpIdEvT_S0_
+     7: 0000000000000000     0 SECTION LOCAL  DEFAULT    9 .rodata
+     8: 0000000000000000    19 FUNC    GLOBAL DEFAULT    3 _Z3cmpIPKcEvT_S2_
+     9: 0000000000000013    11 FUNC    GLOBAL DEFAULT    3 _Z5func2v
+    10: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    6 a
+    11: 0000000000000029    90 FUNC    GLOBAL DEFAULT    3 main
+    12: 0000000000000000    17 FUNC    WEAK   DEFAULT    7 _Z3cmpIiEvT_S0_
+    13: 0000000000000000    21 FUNC    WEAK   DEFAULT    8 _Z3cmpIdEvT_S0_
+    14: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND _Z4fun1v
+    15: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND c
+
+```
+
+readelf 解释 :
+
+- Bind（绑定）：Bind字段表示符号的绑定属性，它指示符号的可见性和链接类型。以下是常见的绑定属性：
+  - LOCAL（局部）：符号只在定义它的目标文件中可见，其他目标文件无法引用它。
+  - GLOBAL（全局）：符号可以被其他目标文件引用，可以在整个程序中共享。
+  - WEAK（弱）：与全局符号类似，可以被其他目标文件引用。但是，链接器在有多个定义的情况下不会合并弱符号，而是选择一个默认版本。
+- Vis（可见性）：Vis字段表示符号的可见性属性，它指示符号在链接时的可见范围。以下是常见的可见性属性：
+  - DEFAULT（默认）：符号在链接时可以被其他目标文件引用。
+  - HIDDEN（隐藏）：符号在链接时只能被定义它的目标文件引用，其他目标文件无法引用它。
+  - INTERNAL（内部）：符号在链接时只能被同一目标文件中的其他符号引用，对于其他目标文件是不可见的。
+- Ndx（索引）：Ndx字段表示符号的节索引，它指示符号所属的节（section）。节是目标文件中的一段数据，符号在特定的节中定义或引用。节索引指示了符号所属的节的位置。
+
+以下是具体示例
 ```shell
 template<typename T>
 void cmp(T a, T b)
@@ -59,57 +104,18 @@ int main()
 	return 0;
 }
 ```
+规律总结如下:
+|  | 类型 | 名称 | 连接类型 | 字节索引 |
+| --------------- | --------------- | --------------- | --------------- | --------------- |
+| 已定义的变量 | OBJECT | 和变量命相同 | GLOBAL/LOCAL | 存在 |
+| 已定义的普通函数 | FUNC | 由函数名参数列表构成 | GLOBAL/LOCAL | 存在 |
+| 已定义的模板函数 | 不生成 | - | - | - |
+| 已定义的模板函数的调用处 | FUNC | 由函数名和参数列表构成 | WEAK | 存在 |
+| static定义 | OBJECT/FUNC | - | LOCAL | 存在 |
+| extern定义 | OBJECT/FUNC | - | GLOBAL | 存在 |
+| extern引用 | NOTYPE | - | GLOBAL | UND |
 
-```shell
-root@u22:/mnt/share/cpp_study/test# readelf -s main.o
-
-Symbol table '.symtab' contains 16 entries:
-   Num:    Value          Size Type    Bind   Vis      Ndx Name
-     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
-     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS main.cpp
-     2: 0000000000000000     0 SECTION LOCAL  DEFAULT    3 .text
-     3: 000000000000001e    11 FUNC    LOCAL  DEFAULT    3 _ZL5func3v
-     4: 0000000000000004     4 OBJECT  LOCAL  DEFAULT    6 _ZL1b
-     5: 0000000000000000     0 SECTION LOCAL  DEFAULT    7 .text._Z3cmpIiEvT_S0_
-     6: 0000000000000000     0 SECTION LOCAL  DEFAULT    8 .text._Z3cmpIdEvT_S0_
-     7: 0000000000000000     0 SECTION LOCAL  DEFAULT    9 .rodata
-     8: 0000000000000000    19 FUNC    GLOBAL DEFAULT    3 _Z3cmpIPKcEvT_S2_
-     9: 0000000000000013    11 FUNC    GLOBAL DEFAULT    3 _Z5func2v
-    10: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    6 a
-    11: 0000000000000029    90 FUNC    GLOBAL DEFAULT    3 main
-    12: 0000000000000000    17 FUNC    WEAK   DEFAULT    7 _Z3cmpIiEvT_S0_
-    13: 0000000000000000    21 FUNC    WEAK   DEFAULT    8 _Z3cmpIdEvT_S0_
-    14: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND _Z4fun1v
-    15: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND c
-
-```
-
-readelf 解释 :
-
-- Bind（绑定）：Bind字段表示符号的绑定属性，它指示符号的可见性和链接类型。以下是常见的绑定属性：
- - LOCAL（局部）：符号只在定义它的目标文件中可见，其他目标文件无法引用它。
- - GLOBAL（全局）：符号可以被其他目标文件引用，可以在整个程序中共享。
- - WEAK（弱）：与全局符号类似，可以被其他目标文件引用。但是，链接器在有多个定义的情况下不会合并弱符号，而是选择一个默认版本。
-- Vis（可见性）：Vis字段表示符号的可见性属性，它指示符号在链接时的可见范围。以下是常见的可见性属性：
- - DEFAULT（默认）：符号在链接时可以被其他目标文件引用。
- - HIDDEN（隐藏）：符号在链接时只能被定义它的目标文件引用，其他目标文件无法引用它。
- - INTERNAL（内部）：符号在链接时只能被同一目标文件中的其他符号引用，对于其他目标文件是不可见的。
-- Ndx（索引）：Ndx字段表示符号的节索引，它指示符号所属的节（section）。节是目标文件中的一段数据，符号在特定的节中定义或引用。节索引指示了符号所属的节的位置。
-
-
-### C++符号
-C++符号根据 作用域+模板参数列表+函数名+参数列表组成
-
-使用 c++filt 可以将根据符号得到真正的函数类型
-```shell
-root@u22:/mnt/share/cpp_study/test# c++filt _Z3cmpIiEiT_S0_
-int cmp<int>(int, int)
-```
-
-## 链接
-## 加载
-
-# 函数调用
+## 函数调用
 ```asm
 #include <iostream>
 using namespace std;
